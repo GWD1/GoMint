@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 391 )
-public class ItemCarrot extends ItemStack implements io.gomint.inventory.item.ItemCarrot {
+public class ItemCarrot extends ItemFood implements io.gomint.inventory.item.ItemCarrot {
 
     // CHECKSTYLE:OFF
     public ItemCarrot( short data, int amount ) {
@@ -25,6 +25,16 @@ public class ItemCarrot extends ItemStack implements io.gomint.inventory.item.It
     @Override
     public ItemType getType() {
         return ItemType.CARROT;
+    }
+
+    @Override
+    public float getSaturation() {
+        return 0.6f;
+    }
+
+    @Override
+    public float getHunger() {
+        return 3;
     }
 
 }

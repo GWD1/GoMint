@@ -121,4 +121,18 @@ public interface EntityLiving extends Entity {
      */
     void teleport( Location to );
 
+    /**
+     * Get the movement speed of this entity
+     *
+     * @return movement speed
+     */
+    float getMovementSpeed();
+
+    /**
+     * Set movement speed of this entity
+     *
+     * @param value of the new movement speed
+     */
+    void setMovementSpeed( float value );
+
 }

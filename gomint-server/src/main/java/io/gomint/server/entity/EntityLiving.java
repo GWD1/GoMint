@@ -144,7 +144,7 @@ public abstract class EntityLiving extends Entity implements InventoryHolder, io
 
     @Override
     public void update( long currentTimeMS, float dT ) {
-        if ( !( this instanceof EntityPlayer ) && !( this.isDead() || this.getHealth() <= 0 ) ) {
+        if ( !( this.isDead() || this.getHealth() <= 0 ) ) {
             super.update( currentTimeMS, dT );
             this.behaviour.update( currentTimeMS, dT );
         }
@@ -348,9 +348,9 @@ public abstract class EntityLiving extends Entity implements InventoryHolder, io
         entityEvent.setEntityId( this.id );
         entityEvent.setEventId( ( health <= 0 ) ? EntityEvent.DEATH.getId() : EntityEvent.HURT.getId() );
 
-        ObjCursor<io.gomint.entity.Entity> attachedEntities = this.attachedEntities.cursor();
-        while ( attachedEntities.moveNext() ) {
-            EntityPlayer entityPlayer = (EntityPlayer) attachedEntities.elem();
+        ObjCursor<io.gomint.entity.Entity> attachedEntitiesCursor = this.attachedEntities.cursor();
+        while ( attachedEntitiesCursor.moveNext() ) {
+            EntityPlayer entityPlayer = (EntityPlayer) attachedEntitiesCursor.elem();
             entityPlayer.getConnection().addToSendQueue( entityEvent );
         }
 
@@ -364,7 +364,7 @@ public abstract class EntityLiving extends Entity implements InventoryHolder, io
             if ( distance > 0.0 ) {
                 float baseModifier = 0.4F;
 
-                distance = 1f / distance;
+                distance = 1 / distance;
 
                 Vector motion = this.getVelocity();
                 motion.divide( 2f, 2f, 2f );
@@ -525,6 +525,16 @@ public abstract class EntityLiving extends Entity implements InventoryHolder, io
         }
 
         this.fallDistance = 0;
+    }
+
+    @Override
+    public float getMovementSpeed() {
+        return this.getAttribute( Attribute.MOVEMENT_SPEED );
+    }
+
+    @Override
+    public void setMovementSpeed( float value ) {
+        this.setAttribute( Attribute.MOVEMENT_SPEED, value );
     }
 
 }
