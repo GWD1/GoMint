@@ -11,5 +11,5 @@ package io.gomint.inventory;
  * @author geNAZt
  * @version 1.0
  */
-public interface ChestInventory {
+public interface ChestInventory extends ContainerInventory {
 }

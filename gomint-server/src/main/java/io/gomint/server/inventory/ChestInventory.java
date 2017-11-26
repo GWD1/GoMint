@@ -7,7 +7,6 @@
 
 package io.gomint.server.inventory;
 
-import io.gomint.entity.Entity;
 import io.gomint.math.BlockPosition;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.network.PlayerConnection;
@@ -18,13 +17,11 @@ import io.gomint.server.network.type.WindowType;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.world.Sound;
 
-import java.util.function.Predicate;
-
 /**
  * @author geNAZt
  * @version 1.0
  */
-public class ChestInventory extends ContainerInventory {
+public class ChestInventory extends ContainerInventory implements io.gomint.inventory.ChestInventory {
 
     /**
      * Create new chest inventory
@@ -73,13 +70,7 @@ public class ChestInventory extends ContainerInventory {
             blockEvent.setData1( 1 );
             blockEvent.setData2( 2 );
 
-            world.sendToVisible( position, blockEvent, new Predicate<Entity>() {
-                @Override
-                public boolean test( Entity entity ) {
-                    return true;
-                }
-            } );
-
+            world.sendToVisible( position, blockEvent, entity -> true );
             world.playSound( position.toVector().add( 0.5f, 0.5f, 0.5f ), Sound.CHEST_OPEN, (byte) 1 );
         }
     }
@@ -96,13 +87,7 @@ public class ChestInventory extends ContainerInventory {
             blockEvent.setData1( 1 );
             blockEvent.setData2( 0 );
 
-            world.sendToVisible( position, blockEvent, new Predicate<Entity>() {
-                @Override
-                public boolean test( Entity entity ) {
-                    return true;
-                }
-            } );
-
+            world.sendToVisible( position, blockEvent, entity -> true );
             world.playSound( position.toVector().add( 0.5f, 0.5f, 0.5f ), Sound.CHEST_CLOSED, (byte) 1 );
         }
     }

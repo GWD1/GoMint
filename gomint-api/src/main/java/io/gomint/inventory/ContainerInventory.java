@@ -8,6 +8,7 @@
 package io.gomint.inventory;
 
 import io.gomint.math.BlockPosition;
+import io.gomint.world.World;
 
 /**
  * @author geNAZt
@@ -21,5 +22,12 @@ public interface ContainerInventory {
      * @return block position of this container
      */
     BlockPosition getContainerPosition();
+
+    /**
+     * Get the world in which this container has been placed
+     *
+     * @return world of this container
+     */
+    World getWorld();
 
 }
