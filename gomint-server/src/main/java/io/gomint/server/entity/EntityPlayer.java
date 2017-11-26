@@ -189,6 +189,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      *
      * @return The view distance set by the player
      */
+    @Override
     public int getViewDistance() {
         return this.viewDistance;
     }
@@ -426,6 +427,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      *
      * @return the players inventory
      */
+    @Override
     public PlayerInventory getInventory() {
         return inventory;
     }
@@ -467,6 +469,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      *
      * @return the players armor
      */
+    @Override
     public ArmorInventory getArmorInventory() {
         return armorInventory;
     }
@@ -733,6 +736,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      *
      * @return xbox user id
      */
+    @Override
     public String getXboxID() {
         return this.xboxId;
     }

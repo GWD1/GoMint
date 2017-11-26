@@ -251,6 +251,7 @@ public abstract class EntityLiving extends Entity implements InventoryHolder, io
      *
      * @return the spawn packet of this entity, ready to be sent to the client
      */
+    @Override
     public Packet createSpawnPacket() {
         // Broadcast spawn entity packet:
         PacketSpawnEntity packet = new PacketSpawnEntity();
@@ -535,6 +536,16 @@ public abstract class EntityLiving extends Entity implements InventoryHolder, io
     @Override
     public void setMovementSpeed( float value ) {
         this.setAttribute( Attribute.MOVEMENT_SPEED, value );
+    }
+
+    @Override
+    public String getNameTag() {
+        return getMetadata().getString( 4 );
+    }
+
+    @Override
+    public void setNameTag( String nameTag ) {
+        getMetadata().putString( 4, nameTag );
     }
 
 }

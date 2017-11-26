@@ -135,4 +135,22 @@ public interface EntityLiving extends Entity {
      */
     void setMovementSpeed( float value );
 
+    /**
+     * Get the name tag of this entity
+     * 
+     * The name tag is shown above the entity in the client
+     * 
+     * @return The name tag of the entity
+     */
+    String getNameTag();
+
+    /**
+     * Set the name tag of this entity
+     *
+     * The name tag is shown above the entity in the client
+     * 
+     * @param nameTag The new name tag of this entity
+     */
+    void setNameTag( String nameTag );
+
 }
