@@ -772,4 +772,8 @@ public class PlayerConnection {
         return ( this.connection != null ) ? this.connection.getGuid() : this.tcpId;
     }
 
+    @Override
+    public String toString() {
+        return this.entity != null ? this.entity.getName() : ( this.connection != null ) ? String.valueOf( this.connection.getGuid() ) : "unknown";
+    }
 }

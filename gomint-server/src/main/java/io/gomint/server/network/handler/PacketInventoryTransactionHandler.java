@@ -34,6 +34,8 @@ public class PacketInventoryTransactionHandler implements PacketHandler<PacketIn
 
     @Override
     public void handle( PacketInventoryTransaction packet, long currentTimeMillis, PlayerConnection connection ) {
+        LOGGER.info( packet.toString() );
+
         switch ( packet.getType() ) {
             case PacketInventoryTransaction.TYPE_NORMAL:
                 this.handleTypeNormal( connection, packet );
@@ -321,7 +323,7 @@ public class PacketInventoryTransactionHandler implements PacketHandler<PacketIn
     }
 
     private void handleTypeNormal( PlayerConnection connection, PacketInventoryTransaction packet ) {
-        TransactionGroup transactionGroup = new TransactionGroup();
+        TransactionGroup transactionGroup = new TransactionGroup( connection.getEntity() );
         for ( PacketInventoryTransaction.NetworkTransaction transaction : packet.getActions() ) {
             Inventory inventory = getInventory( transaction, connection.getEntity() );
 

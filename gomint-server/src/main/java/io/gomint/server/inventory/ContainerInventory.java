@@ -6,18 +6,20 @@ import io.gomint.server.entity.tileentity.TileEntity;
 import io.gomint.server.network.packet.PacketContainerOpen;
 import io.gomint.server.network.type.WindowType;
 import io.gomint.server.world.WorldAdapter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
-public abstract class ContainerInventory extends Inventory {
+public abstract class ContainerInventory extends Inventory implements io.gomint.inventory.ContainerInventory {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger( ContainerInventory.class );
-
-    public ContainerInventory( InventoryHolder owner, int size ) {
+    /**
+     * Construct a new container inventory
+     *
+     * @param owner of the container (mostly a tile or normal entity)
+     * @param size  of the entity
+     */
+    ContainerInventory( InventoryHolder owner, int size ) {
         super( owner, size );
     }
 
@@ -28,11 +30,7 @@ public abstract class ContainerInventory extends Inventory {
      */
     public abstract WindowType getType();
 
-    /**
-     * Get the position of this container
-     *
-     * @return block position of the container
-     */
+    @Override
     public BlockPosition getContainerPosition() {
         TileEntity tileEntity = (TileEntity) this.owner;
         return tileEntity.getLocation().toBlockPosition();
