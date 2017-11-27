@@ -197,7 +197,10 @@ public abstract class Entity implements io.gomint.entity.Entity {
                 float movY = this.getMotionY();
                 float movZ = this.getMotionZ();
 
-                Vector moved = this.safeMove( movX, movY, movZ );
+                Vector moved = null;
+                if ( this.shouldMove() ) {
+                    moved = this.safeMove( movX, movY, movZ );
+                }
 
                 if ( this.isAffectedByGravity() ) {
                     // Calc motion
@@ -219,17 +222,19 @@ public abstract class Entity implements io.gomint.entity.Entity {
                     this.transform.setMotion( newMovX, newMovY, newMovZ );
                 }
 
-                // We did not move so we collided, set motion to 0 to escape hell
-                if ( movX != moved.getX() ) {
-                    this.transform.setMotionX( 0 );
-                }
+                if ( moved != null ) {
+                    // We did not move so we collided, set motion to 0 to escape hell
+                    if ( movX != moved.getX() ) {
+                        this.transform.setMotionX( 0 );
+                    }
 
-                if ( movY != moved.getY() ) {
-                    this.transform.setMotionY( 0 );
-                }
+                    if ( movY != moved.getY() ) {
+                        this.transform.setMotionY( 0 );
+                    }
 
-                if ( movZ != moved.getZ() ) {
-                    this.transform.setMotionZ( 0 );
+                    if ( movZ != moved.getZ() ) {
+                        this.transform.setMotionZ( 0 );
+                    }
                 }
             }
 
@@ -254,6 +259,10 @@ public abstract class Entity implements io.gomint.entity.Entity {
 
             this.transform.move( 0, 0, 0 );
         }
+    }
+
+    protected boolean shouldMove() {
+        return true;
     }
 
     /**

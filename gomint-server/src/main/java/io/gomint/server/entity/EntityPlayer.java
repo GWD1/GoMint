@@ -66,6 +66,8 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
     private final PlayerConnection connection;
     private int viewDistance = 4;
+    @Getter
+    private int neededChunksForSpawn;
     private Queue<ChunkAdapter> chunkSendQueue = new LinkedBlockingQueue<>();
 
     // EntityPlayer Information
@@ -559,16 +561,11 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      * Fully init inventory and recipes and other stuff which we need to have a full loaded player
      */
     public void fullyInit() {
-        this.inventory = new PlayerInventory( this );
-        this.armorInventory = new ArmorInventory( this );
-        this.craftingInventory = new CraftingInputInventory( this );
-        this.cursorInventory = new CursorInventory( this );
-        this.offhandInventory = new OffhandInventory( this );
-        this.craftingInputInventory = new CraftingInputInventory( this );
-        this.craftingResultInventory = new CursorInventory( this );
-        this.windowIds = ContainerObjectMap.withExpectedSize( 2 );
-        this.containerIds = ContainerIDMap.withExpectedSize( 2 );
-        this.connection.getServer().getCreativeInventory().addViewer( this );
+        this.connection.sendWorldInitialization();
+        this.connection.sendWorldTime( 0 );
+        this.updateAttributes();
+
+        this.sendCommands();
 
         int gameModeNumber = EnumConnectors.GAMEMODE_CONNECTOR.convert( this.gamemode ).getMagicNumber();
         this.getAdventureSettings().setWorldImmutable( gameModeNumber == 0x03 );
@@ -579,8 +576,19 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         this.getAdventureSettings().setAttackPlayers( gameModeNumber < 0x02 );
         this.getAdventureSettings().setNoPvP( gameModeNumber == 0x03 );
         this.getAdventureSettings().update();
-        this.updateAttributes();
-        this.connection.sendPlayState( PacketPlayState.PlayState.SPAWN );
+
+        this.sendData( this );
+
+        this.inventory = new PlayerInventory( this );
+        this.armorInventory = new ArmorInventory( this );
+        this.craftingInventory = new CraftingInputInventory( this );
+        this.cursorInventory = new CursorInventory( this );
+        this.offhandInventory = new OffhandInventory( this );
+        this.craftingInputInventory = new CraftingInputInventory( this );
+        this.craftingResultInventory = new CursorInventory( this );
+        this.windowIds = ContainerObjectMap.withExpectedSize( 2 );
+        this.containerIds = ContainerIDMap.withExpectedSize( 2 );
+        this.connection.getServer().getCreativeInventory().addViewer( this );
 
         // Update player list
         PacketPlayerlist playerlist = new PacketPlayerlist();
@@ -593,14 +601,8 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         // Spawn for others
         this.getWorld().spawnEntityAt( this, this.getPositionX(), this.getPositionY(), this.getPositionZ(), this.getYaw(), this.getPitch() );
 
-        this.getConnection().sendWorldTime( 0 );
-        this.sendData( this );
-        this.getConnection().sendMovePlayer( this.getLocation() );
-
         // Send crafting recipes
         this.connection.send( this.world.getServer().getRecipeManager().getCraftingRecipesBatch() );
-
-        this.sendCommands();
 
         // Now its time for the join event since the player is fully loaded
         PlayerJoinEvent event = this.getConnection().getNetworkManager().getServer().getPluginManager().callEvent( new PlayerJoinEvent( this ) );
@@ -632,6 +634,11 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         packetSpawnPlayer.setItemInHand( this.getInventory().getItemInHand() );
         packetSpawnPlayer.setMetadataContainer( this.getMetadata() );
         return packetSpawnPlayer;
+    }
+
+    @Override
+    protected boolean shouldMove() {
+        return false;
     }
 
     /**
@@ -1254,6 +1261,17 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     @Override
     public void playSound( Vector location, Sound sound, byte pitch ) {
         this.world.playSound( this, location, sound, pitch, -1 );
+    }
+
+    public void loginInit() {
+        // We attach to the world to get chunks
+        this.neededChunksForSpawn = this.world.addPlayer( this );
+        LOGGER.info( "Player {} needs {} chunks for spawn", this, this.neededChunksForSpawn );
+    }
+
+    public void firstSpawn() {
+        this.connection.sendPlayState( PacketPlayState.PlayState.SPAWN );
+        this.getConnection().sendMovePlayer( this.getLocation() );
     }
 
 }

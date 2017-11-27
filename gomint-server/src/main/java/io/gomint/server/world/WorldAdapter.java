@@ -429,19 +429,24 @@ public abstract class WorldAdapter implements World {
      * the player for send.
      *
      * @param player The player entity to add to the world
+     * @return amount of chunks until the player can be spawned for the first time
      */
-    public void addPlayer( io.gomint.server.entity.EntityPlayer player ) {
+    public int addPlayer( io.gomint.server.entity.EntityPlayer player ) {
         // Schedule sending spawn region chunks:
-        final int minChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) - 4;
-        final int minChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) - 4;
-        final int maxChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) + 4;
-        final int maxChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) + 4;
+        final int minChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) - 3;
+        final int minChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) - 3;
+        final int maxChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) + 3;
+        final int maxChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) + 3;
 
+        int amountOfChunks = 0;
         for ( int i = minChunkZ; i <= maxChunkZ; ++i ) {
             for ( int j = minChunkX; j <= maxChunkX; ++j ) {
-                this.sendChunk( j, i, player, false );
+                amountOfChunks++;
+                this.sendChunk( j, i, player, true );
             }
         }
+
+        return amountOfChunks;
     }
 
     /**
@@ -450,8 +455,6 @@ public abstract class WorldAdapter implements World {
      * @param player The player entity which should be removed from the world
      */
     public void removePlayer( io.gomint.server.entity.EntityPlayer player ) {
-        logger.debug( "Removing player: " + player );
-
         ChunkAdapter chunkAdapter = this.players.remove( player );
         if ( chunkAdapter != null ) {
             chunkAdapter.removePlayer( player );
