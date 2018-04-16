@@ -31,4 +31,9 @@ public class PackedIce extends Block implements io.gomint.world.block.BlockPacke
         return BlockType.PACKED_ICE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

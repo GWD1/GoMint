@@ -39,16 +39,7 @@ public class EntityFishingHook extends EntityProjectile implements io.gomint.ent
         this.setSize( 0.25f, 0.25f );
 
         // Calculate starting position
-        Location position = player.getLocation();
-        position.add(
-            -(float) ( Math.cos( position.getYaw() / 180 * Math.PI ) * 0.16f ),
-            player.getEyeHeight() - 0.1f,
-            -(float) ( Math.sin( position.getYaw() / 180 * Math.PI ) * 0.16f )
-        );
-
-        this.setPosition( position );
-        this.setYaw( position.getYaw() );
-        this.setPitch( position.getPitch() );
+        Location position = this.setPositionFromShooter();
 
         // Calculate motion
         Vector motion = new Vector(

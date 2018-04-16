@@ -34,18 +34,18 @@ public interface EntityLiving extends Entity {
     float getHealth();
 
     /**
+     * Set the maximum amount of health this entity can have
+     *
+     * @param amount of health this entity can have as a max
+     */
+    void setMaxHealth( float amount );
+
+    /**
      * Get the maximum amount of health this entity can have
      *
      * @return maximum amount of health this entity can have
      */
     float getMaxHealth();
-
-    /**
-     * Set this entity immobile
-     *
-     * @param value true if immobile, false if not
-     */
-    void setImmobile( boolean value );
 
     /**
      * Get the entities last damage source
@@ -115,13 +115,6 @@ public interface EntityLiving extends Entity {
     void removeAllEffects();
 
     /**
-     * Teleport to the given location
-     *
-     * @param to The location where the entity should be teleported to
-     */
-    void teleport( Location to );
-
-    /**
      * Get the movement speed of this entity
      *
      * @return movement speed
@@ -136,21 +129,24 @@ public interface EntityLiving extends Entity {
     void setMovementSpeed( float value );
 
     /**
-     * Get the name tag of this entity
-     * 
-     * The name tag is shown above the entity in the client
-     * 
-     * @return The name tag of the entity
+     * Attack given entity
+     *
+     * @param damage amount which should be dealt
+     * @param source of the damage, controls armor calcs etc.
      */
-    String getNameTag();
+    void attack( float damage, EntityDamageEvent.DamageSource source );
 
     /**
-     * Set the name tag of this entity
+     * Set entity on fire for given amount of seconds
      *
-     * The name tag is shown above the entity in the client
-     * 
-     * @param nameTag The new name tag of this entity
+     * @param duration for how long this entity should be on fire
+     * @param unit     with which the duration should be multiplied
      */
-    void setNameTag( String nameTag );
+    void setBurning( long duration, TimeUnit unit );
+
+    /**
+     * Extinguish this entity
+     */
+    void extinguish();
 
 }

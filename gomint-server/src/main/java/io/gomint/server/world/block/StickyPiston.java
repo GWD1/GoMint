@@ -36,4 +36,9 @@ public class StickyPiston extends Block implements io.gomint.world.block.BlockSt
         return BlockType.STICKY_PISTON;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

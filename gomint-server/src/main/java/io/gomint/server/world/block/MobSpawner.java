@@ -36,4 +36,9 @@ public class MobSpawner extends Block implements io.gomint.world.block.BlockMobS
         return BlockType.MOB_SPAWNER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

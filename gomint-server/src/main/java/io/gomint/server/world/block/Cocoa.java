@@ -36,4 +36,9 @@ public class Cocoa extends Block implements io.gomint.world.block.BlockCocoa {
         return BlockType.COCOA;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

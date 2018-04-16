@@ -30,14 +30,14 @@ public class PacketUpdateBlock extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID) {
         writeBlockPosition( this.position, buffer );
         buffer.writeUnsignedVarInt( this.blockId );
         buffer.writeUnsignedVarInt( this.prioAndMetadata );
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

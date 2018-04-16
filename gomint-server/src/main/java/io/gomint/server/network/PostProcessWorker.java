@@ -3,8 +3,6 @@ package io.gomint.server.network;
 import io.gomint.jraknet.PacketBuffer;
 import io.gomint.server.network.packet.Packet;
 import io.gomint.server.network.packet.PacketBatch;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +17,8 @@ import java.util.zip.Deflater;
  * @version 1.0
  */
 public class PostProcessWorker implements Runnable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger( PostProcessWorker.class );
 
     private static final ThreadLocal<BatchStreamHolder> BATCH_HOLDER = new ThreadLocal<>();
     private final PlayerConnection connection;
@@ -41,22 +41,24 @@ public class PostProcessWorker implements Runnable {
 
     @Override
     public void run() {
+        this.connection.getServer().getWatchdog().add( 1, TimeUnit.SECONDS );
+
         BatchStreamHolder holder = this.getHolder();
 
         // Batch them first
         for ( Packet packet : this.packets ) {
-            // LOGGER.debug( "Sending to " + connection.getEntity().getName() + ": " + packet );
-
             PacketBuffer buffer = new PacketBuffer( 64 );
             buffer.writeByte( packet.getId() );
             buffer.writeShort( (short) 0 );
-            packet.serialize( buffer );
+            packet.serialize( buffer, this.connection.getProtocolID() );
+
+            LOGGER.debug( "Writing packet data to client {}", Integer.toHexString( packet.getId() & 0xFF ) );
 
             try {
                 writeVarInt( buffer.getPosition(), holder.getOutputStream() );
                 holder.getOutputStream().write( buffer.getBuffer(), buffer.getBufferOffset(), buffer.getPosition() - buffer.getBufferOffset() );
             } catch ( IOException e ) {
-                e.printStackTrace();
+                LOGGER.error( "Could not write packet data into batch: ", e );
             }
         }
 
@@ -69,6 +71,8 @@ public class PostProcessWorker implements Runnable {
         }
 
         holder.reset();
+
+        this.connection.getServer().getWatchdog().done();
         this.connection.send( batch );
     }
 

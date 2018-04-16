@@ -31,4 +31,9 @@ public class Obsidian extends Block implements io.gomint.world.block.BlockObsidi
         return BlockType.OBSIDIAN;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

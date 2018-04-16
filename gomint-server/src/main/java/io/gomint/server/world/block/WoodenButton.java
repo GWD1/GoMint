@@ -1,12 +1,12 @@
 package io.gomint.server.world.block;
 
-import io.gomint.world.block.BlockType;
-
 import io.gomint.inventory.item.ItemStack;
 import io.gomint.math.Vector;
 import io.gomint.server.entity.Entity;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.server.world.UpdateReason;
+import io.gomint.world.block.BlockFace;
+import io.gomint.world.block.BlockType;
 
 import java.util.concurrent.TimeUnit;
 
@@ -43,7 +43,7 @@ public class WoodenButton extends Block implements io.gomint.world.block.BlockWo
     }
 
     @Override
-    public boolean interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public boolean interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         // Press the button
         this.press();
 
@@ -52,11 +52,9 @@ public class WoodenButton extends Block implements io.gomint.world.block.BlockWo
 
     @Override
     public long update( UpdateReason updateReason, long currentTimeMS, float dT ) {
-        if ( updateReason == UpdateReason.SCHEDULED ) {
-            if ( isPressed() ) {
-                this.setBlockData( (byte) ( this.getBlockData() ^ 0x08 ) );
-                this.updateBlock();
-            }
+        if ( updateReason == UpdateReason.SCHEDULED && isPressed() ) {
+            this.setBlockData( (byte) ( this.getBlockData() ^ 0x08 ) );
+            this.updateBlock();
         }
 
         return -1;
@@ -73,7 +71,7 @@ public class WoodenButton extends Block implements io.gomint.world.block.BlockWo
             this.updateBlock();
         }
 
-        // Schedule release in 2 seconds
+        // Schedule release in 1 second
         this.world.scheduleBlockUpdate( this.location, 1, TimeUnit.SECONDS );
     }
 

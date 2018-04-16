@@ -36,4 +36,9 @@ public class GlowingRedstoneOre extends Block implements io.gomint.world.block.B
         return BlockType.GLOWING_REDSTONE_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

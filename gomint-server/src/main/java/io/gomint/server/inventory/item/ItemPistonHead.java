@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 34 )
- public class ItemPistonHead extends ItemStack implements io.gomint.inventory.item.ItemPistonHead {
+ public class ItemPistonHead extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemPistonHead( short data, int amount ) {

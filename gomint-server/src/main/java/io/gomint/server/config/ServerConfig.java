@@ -7,8 +7,8 @@
 
 package io.gomint.server.config;
 
-import com.blackypaw.simpleconfig.SimpleConfig;
-import com.blackypaw.simpleconfig.annotation.Comment;
+import io.gomint.config.Comment;
+import io.gomint.config.YamlConfig;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -24,7 +24,7 @@ import java.util.List;
  */
 @NoArgsConstructor
 @Getter
-public class ServerConfig extends SimpleConfig {
+public class ServerConfig extends YamlConfig {
 
     // ------------------------ General
     @Comment( "The host and port to bind the server to" )
@@ -57,7 +57,7 @@ public class ServerConfig extends SimpleConfig {
     private boolean loadAllWorldsAtStart = false;
 
     @Comment( "Configure each world like you need to" )
-    private List<WorldConfig> worlds = new ArrayList<WorldConfig>(){{
+    private List<WorldConfig> worlds = new ArrayList<WorldConfig>() {{
         add( new WorldConfig() );
     }};
 

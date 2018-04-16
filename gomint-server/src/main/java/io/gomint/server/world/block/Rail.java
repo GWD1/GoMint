@@ -41,4 +41,8 @@ public class Rail extends Block implements io.gomint.world.block.BlockRail {
         return BlockType.RAIL;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
 }

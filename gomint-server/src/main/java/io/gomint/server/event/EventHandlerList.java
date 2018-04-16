@@ -12,7 +12,6 @@ import io.gomint.event.CancellableEvent;
 import io.gomint.event.Event;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -44,7 +43,7 @@ public class EventHandlerList {
      * @param handler The handler which should be added
      */
     void addHandler( String key, EventHandlerMethod handler ) {
-        Preconditions.checkArgument( !this.handlers.containsKey( key ), "EventHandler can't be registered twice" );
+        Preconditions.checkArgument( !this.handlers.containsKey( key ), "EventHandler can't be registered twice. Other instance: " + this.handlers.get( key ) );
 
         this.handlers.put( key, handler );
 

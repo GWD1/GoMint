@@ -15,6 +15,7 @@ import java.util.Map;
  */
 @Data
 public class PacketStartGame extends Packet {
+
     // Entity data
     private long entityId;
     private long runtimeEntityId;
@@ -48,6 +49,9 @@ public class PacketStartGame extends Packet {
     private boolean hasTrustPlayersEnabled;
     private int defaultPlayerPermission = PlayerPermission.MEMBER.getId();
     private int xboxLiveBroadcastMode = 0;
+    private boolean hasPlatformBroadcast = false;
+    private int platformBroadcastMode = 0;
+    private boolean xboxLiveBroadcastIntent = false;
 
     // World data
     private String levelId;
@@ -57,20 +61,25 @@ public class PacketStartGame extends Packet {
     private long currentTick;
     private int enchantmentSeed;
 
+    /**
+     * Create a new start game packet
+     */
     public PacketStartGame() {
         super( Protocol.PACKET_START_GAME );
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
-        buffer.writeSignedVarLong( this.entityId );
-        buffer.writeUnsignedVarLong( this.runtimeEntityId );
-        buffer.writeSignedVarInt( this.gamemode );
-        buffer.writeLFloat( this.spawn.getX() );
+    public void serialize( PacketBuffer buffer, int protocolID ) {
+        buffer.writeSignedVarLong( this.entityId ); // EntityUnique
+        buffer.writeUnsignedVarLong( this.runtimeEntityId ); // EntityRuntime
+        buffer.writeSignedVarInt( this.gamemode ); // VarInt
+        buffer.writeLFloat( this.spawn.getX() ); // Vec3
         buffer.writeLFloat( this.spawn.getY() );
         buffer.writeLFloat( this.spawn.getZ() );
-        buffer.writeLFloat( this.spawn.getYaw() );
+        buffer.writeLFloat( this.spawn.getYaw() ); // Vec2
         buffer.writeLFloat( this.spawn.getPitch() );
+
+        // LevelSettings
         buffer.writeSignedVarInt( this.seed );
         buffer.writeSignedVarInt( this.dimension );
         buffer.writeSignedVarInt( this.generator );
@@ -95,6 +104,9 @@ public class PacketStartGame extends Packet {
         buffer.writeBoolean( this.hasTrustPlayersEnabled );
         buffer.writeSignedVarInt( this.defaultPlayerPermission );
         buffer.writeSignedVarInt( this.xboxLiveBroadcastMode );
+        buffer.writeBoolean( this.hasPlatformBroadcast );
+        buffer.writeUnsignedVarInt( this.platformBroadcastMode );
+        buffer.writeBoolean( this.xboxLiveBroadcastIntent );
 
         buffer.writeString( this.levelId );
         buffer.writeString( this.worldName );
@@ -105,7 +117,7 @@ public class PacketStartGame extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 }

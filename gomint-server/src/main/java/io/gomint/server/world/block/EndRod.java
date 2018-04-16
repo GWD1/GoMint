@@ -26,4 +26,9 @@ public class EndRod extends Block implements io.gomint.world.block.BlockEndRod {
         return BlockType.END_ROD;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

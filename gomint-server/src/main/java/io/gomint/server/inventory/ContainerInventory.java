@@ -3,7 +3,10 @@ package io.gomint.server.inventory;
 import io.gomint.math.BlockPosition;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.entity.tileentity.TileEntity;
+import io.gomint.server.network.PlayerConnection;
 import io.gomint.server.network.packet.PacketContainerOpen;
+import io.gomint.server.network.packet.PacketInventoryContent;
+import io.gomint.server.network.packet.PacketInventorySetSlot;
 import io.gomint.server.network.type.WindowType;
 import io.gomint.server.world.WorldAdapter;
 
@@ -36,6 +39,7 @@ public abstract class ContainerInventory extends Inventory implements io.gomint.
         return tileEntity.getLocation().toBlockPosition();
     }
 
+    @Override
     public WorldAdapter getWorld() {
         TileEntity tileEntity = (TileEntity) this.owner;
         return (WorldAdapter) tileEntity.getLocation().getWorld();
@@ -83,6 +87,27 @@ public abstract class ContainerInventory extends Inventory implements io.gomint.
 
         // Remove from view
         super.removeViewer( player );
+    }
+
+    @Override
+    public void sendContents( PlayerConnection playerConnection ) {
+        byte windowId = playerConnection.getEntity().getWindowId( this );
+
+        PacketInventoryContent inventoryContent = new PacketInventoryContent();
+        inventoryContent.setWindowId( windowId );
+        inventoryContent.setItems( this.getContents() );
+        playerConnection.addToSendQueue( inventoryContent );
+    }
+
+    @Override
+    public void sendContents( int slot, PlayerConnection playerConnection ) {
+        byte windowId = playerConnection.getEntity().getWindowId( this );
+
+        PacketInventorySetSlot inventorySetSlot = new PacketInventorySetSlot();
+        inventorySetSlot.setWindowId( windowId );
+        inventorySetSlot.setSlot( slot );
+        inventorySetSlot.setItemStack( this.getItem( slot ) );
+        playerConnection.addToSendQueue( inventorySetSlot );
     }
 
 }

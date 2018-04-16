@@ -49,4 +49,9 @@ public class PistonHead extends Block implements io.gomint.world.block.BlockPist
         return BlockType.PISTON_HEAD;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

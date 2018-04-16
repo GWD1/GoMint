@@ -15,6 +15,7 @@ import io.gomint.server.network.packet.PacketAddItemEntity;
 import io.gomint.server.network.packet.PacketPickupItemEntity;
 import io.gomint.server.util.Values;
 import io.gomint.server.world.WorldAdapter;
+import io.gomint.world.Gamemode;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -42,9 +43,7 @@ public class EntityItem extends Entity implements EntityItemDrop {
     public EntityItem( ItemStack itemStack, WorldAdapter world ) {
         super( EntityType.ITEM_DROP, world );
         this.itemStack = itemStack;
-        this.setSize( 0.25f, 0.25f );
-        setPickupDelay( 1250, TimeUnit.MILLISECONDS );
-        this.setHasCollision( false );
+        this.initEntity();
     }
 
     /**
@@ -52,9 +51,14 @@ public class EntityItem extends Entity implements EntityItemDrop {
      */
     public EntityItem() {
         super( EntityType.ITEM_DROP, null );
+        this.initEntity();
+    }
+
+    private void initEntity() {
         this.setSize( 0.25f, 0.25f );
         setPickupDelay( 1250, TimeUnit.MILLISECONDS );
         this.setHasCollision( false );
+        this.offsetY = 0.125f;
     }
 
     @Override
@@ -81,9 +85,8 @@ public class EntityItem extends Entity implements EntityItemDrop {
 
         this.lastUpdateDt += dT;
         if ( this.lastUpdateDt >= Values.CLIENT_TICK_RATE ) {
-            if ( this.isCollided && !this.isReset ) {
+            if ( this.isCollided && !this.isReset && this.getVelocity().length() < 0.0025 ) {
                 this.setVelocity( Vector.ZERO ); // Reset velocity
-                this.setImmobile( true );
                 this.isReset = true;
             }
 
@@ -137,6 +140,10 @@ public class EntityItem extends Entity implements EntityItemDrop {
 
             // Ask the API is we can pickup
             PlayerPickupItemEvent event = new PlayerPickupItemEvent( player, this, this.getItemStack() );
+            if ( player.getGamemode() == Gamemode.SPECTATOR ) {
+                event.setCancelled( true );
+            }
+
             this.world.getServer().getPluginManager().callEvent( event );
 
             if ( !event.isCancelled() ) {

@@ -25,7 +25,7 @@ public abstract class ItemReduceTierWooden extends ItemStack implements ItemRedu
     }
 
     @Override
-    public double getDivisor() {
+    public float getDivisor() {
         return 2;
     }
 

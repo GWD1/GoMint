@@ -31,4 +31,9 @@ public class BrickBlock extends Block implements io.gomint.world.block.BlockBric
         return BlockType.BRICK_BLOCK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

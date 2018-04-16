@@ -4,11 +4,15 @@ import io.gomint.inventory.item.ItemAir;
 import io.gomint.inventory.item.ItemStack;
 import io.gomint.math.BlockPosition;
 import io.gomint.math.Location;
+import io.gomint.server.entity.Entity;
 import io.gomint.server.util.random.FastRandom;
 import io.gomint.server.util.random.WeightedRandom;
 import io.gomint.server.world.UpdateReason;
+import io.gomint.world.block.BlockType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
 
 /**
  * @author geNAZt
@@ -33,17 +37,17 @@ public abstract class Growable extends Block {
     }
 
     @Override
-    public boolean beforePlacement( ItemStack item, Location location ) {
+    public boolean beforePlacement( Entity entity, ItemStack item, Location location ) {
         // Check if we place on farmland
-        return location.getWorld().getBlockAt( location.toBlockPosition().add( BlockPosition.DOWN ) ) instanceof Farmland;
+        return location.getWorld().getBlockAt( location.toBlockPosition().add( BlockPosition.DOWN ) ).getType() == BlockType.FARMLAND;
     }
 
     @Override
     public long update( UpdateReason updateReason, long currentTimeMS, float dT ) {
         if ( updateReason == UpdateReason.NEIGHBOUR_UPDATE ) {
             // Check if farmland is still under us
-            if ( !( this.world.getBlockAt( this.location.toBlockPosition().add( BlockPosition.DOWN ) ) instanceof Farmland ) ) {
-                this.world.breakBlock( this.location.toBlockPosition(), false, ItemAir.create( 0 ) );
+            if ( !( this.world.getBlockAt( this.location.toBlockPosition().add( BlockPosition.DOWN ) ).getType() == BlockType.FARMLAND ) ) {
+                this.world.breakBlock( this.location.toBlockPosition(), new ArrayList<>() );
             }
         } else if ( updateReason == UpdateReason.RANDOM ) {
             // Check for growth state

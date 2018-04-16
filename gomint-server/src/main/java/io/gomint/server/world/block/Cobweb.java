@@ -68,4 +68,9 @@ public class Cobweb extends Block implements BlockCobweb {
         return BlockType.COBWEB;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

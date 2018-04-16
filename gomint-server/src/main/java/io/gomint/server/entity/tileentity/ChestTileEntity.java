@@ -8,16 +8,16 @@
 package io.gomint.server.entity.tileentity;
 
 import io.gomint.entity.Entity;
-import io.gomint.inventory.item.ItemStack;
+import io.gomint.server.inventory.item.ItemStack;
+import io.gomint.math.Location;
 import io.gomint.math.Vector;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.inventory.ChestInventory;
 import io.gomint.server.inventory.InventoryHolder;
-import io.gomint.server.inventory.MaterialMagicNumbers;
 import io.gomint.server.inventory.item.ItemAir;
-import io.gomint.server.inventory.item.Items;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.taglib.NBTTagCompound;
+import io.gomint.world.block.BlockFace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +32,26 @@ public class ChestTileEntity extends ContainerTileEntity implements InventoryHol
 
     private static final Logger LOGGER = LoggerFactory.getLogger( ChestTileEntity.class );
     private ChestInventory inventory;
+
+    /**
+     * Construct new chest from given items and location
+     *
+     * @param items which should be inside the chest
+     * @param location of the chest
+     */
+    public ChestTileEntity( ItemStack[] items, Location location ) {
+        super( location );
+        this.inventory = new ChestInventory( this );
+
+        if ( items != null ) {
+            for ( int i = 0; i < items.length; i++ ) {
+                ItemStack itemStack = items[i];
+                if ( itemStack != null ) {
+                    this.inventory.setItem( i, itemStack );
+                }
+            }
+        }
+    }
 
     /**
      * Construct new TileEntity from TagCompound
@@ -57,7 +77,7 @@ public class ChestTileEntity extends ContainerTileEntity implements InventoryHol
 
             byte slot = itemCompound.getByte( "Slot", (byte) 127 );
             if ( slot == 127 ) {
-                LOGGER.warn( "Found item without slot information: " + itemStack.getMaterial() + " @ " + this.location + " setting it to the next free slot" );
+                LOGGER.warn( "Found item without slot information: {} @ {} setting it to the next free slot", itemStack.getMaterial(), this.location );
                 this.inventory.addItem( itemStack );
             } else {
                 this.inventory.setItem( slot, itemStack );
@@ -71,7 +91,7 @@ public class ChestTileEntity extends ContainerTileEntity implements InventoryHol
     }
 
     @Override
-    public void interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public void interact( Entity entity, BlockFace face, Vector facePos, io.gomint.inventory.item.ItemStack item ) {
         // Open the chest inventory for the entity
         if ( entity instanceof EntityPlayer ) {
             ( (EntityPlayer) entity ).openInventory( this.inventory );
@@ -85,11 +105,11 @@ public class ChestTileEntity extends ContainerTileEntity implements InventoryHol
 
         List<NBTTagCompound> nbtTagCompounds = new ArrayList<>();
         for ( int i = 0; i < this.inventory.size(); i++ ) {
-            ItemStack itemStack = this.inventory.getItem( i );
+            ItemStack itemStack = (ItemStack) this.inventory.getItem( i );
             if ( itemStack != null ) {
                 NBTTagCompound nbtTagCompound = new NBTTagCompound( "" );
                 nbtTagCompound.addValue( "Slot", (byte) i );
-                putItemStack( (io.gomint.server.inventory.item.ItemStack) itemStack, nbtTagCompound );
+                putItemStack( itemStack, nbtTagCompound );
                 nbtTagCompounds.add( nbtTagCompound );
             }
         }

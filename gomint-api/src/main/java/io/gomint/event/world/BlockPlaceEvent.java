@@ -21,20 +21,34 @@ public class BlockPlaceEvent extends CancellablePlayerEvent {
     private final Block placedAgainst;
     private final Block shouldReplace;
     private final ItemStack item;
+    private final Block replacingBlock;
 
     /**
      * Created when a player wants to place a block
      *
-     * @param player which wants to place the block
-     * @param placedAgainst against which block did the player place
-     * @param shouldReplace block which should be replaced with the item
-     * @param itemStack which should replace above block
+     * @param player         which wants to place the block
+     * @param placedAgainst  against which block did the player place
+     * @param shouldReplace  block which should be replaced with the item
+     * @param itemStack      which should replace above block
+     * @param replacingBlock get the block which will replace the shouldReplace block
      */
-    public BlockPlaceEvent( EntityPlayer player, Block placedAgainst, Block shouldReplace, ItemStack itemStack ) {
+    public BlockPlaceEvent( EntityPlayer player, Block placedAgainst, Block shouldReplace, ItemStack itemStack, Block replacingBlock ) {
         super( player );
         this.placedAgainst = placedAgainst;
         this.shouldReplace = shouldReplace;
         this.item = itemStack;
+        this.replacingBlock = replacingBlock;
+    }
+
+    /**
+     * Get the block which replaced the {@link #getShouldReplace()} block after this event. This block
+     * can NOT be modified (well you can but the server won't place the block with the modifications made in
+     * this event)
+     *
+     * @return block which replaces the should replace block
+     */
+    public Block getReplacingBlock() {
+        return this.replacingBlock;
     }
 
     /**

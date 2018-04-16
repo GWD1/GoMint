@@ -5,24 +5,29 @@ import io.gomint.event.EventHandler;
 import io.gomint.event.EventListener;
 import io.gomint.event.player.PlayerMoveEvent;
 import io.gomint.math.BlockPosition;
-import io.gomint.math.Vector;
+import io.gomint.plugin.TestPlugin;
 import io.gomint.world.block.Block;
-import io.gomint.world.block.BlockDirt;
+import lombok.RequiredArgsConstructor;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
+@RequiredArgsConstructor
 public class PlayerMoveListener implements EventListener {
+
+    private final TestPlugin plugin;
 
     @EventHandler
     public void onPlayerMove( PlayerMoveEvent event ) {
         BlockPosition toBlock = event.getTo().toBlockPosition();
-        Block block = event.getTo().getWorld().getBlockAt( toBlock.clone().add( BlockPosition.DOWN ) );
+        if ( !toBlock.equals( event.getFrom().toBlockPosition() ) ) {
+            Block block = event.getTo().getWorld().getBlockAt( toBlock );
 
-        event.getPlayer().sendMessage( ChatType.POPUP,
+            event.getPlayer().sendMessage( ChatType.POPUP,
                 "§fX: §a" + toBlock.getX() + " §e- §fY: §a" + toBlock.getY() + " §e- §fZ: §a" + toBlock.getZ() + " | " + event.getPlayer().getPing() + " ms",
-                "§fWalking on block: §a" + block.getClass() );
+                "§fWalking on block: §a" + block.getClass() + ":" + ( (io.gomint.server.world.block.Block) block ).getBlockData() );
+        }
     }
 
 }

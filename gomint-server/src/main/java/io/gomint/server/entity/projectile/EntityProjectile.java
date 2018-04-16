@@ -126,6 +126,7 @@ public abstract class EntityProjectile extends Entity implements io.gomint.entit
                         // Event
                         ProjectileHitEntityEvent entityEvent = new ProjectileHitEntityEvent( hitEntity, this );
                         this.getWorld().getServer().getPluginManager().callEvent( entityEvent );
+
                         if ( !entityEvent.isCancelled() ) {
                             // Calculate damage
                             float motion = (float) Math.sqrt( MathUtils.square( this.getMotionX() ) + MathUtils.square( this.getMotionY() ) + MathUtils.square( this.getMotionZ() ) );
@@ -167,7 +168,7 @@ public abstract class EntityProjectile extends Entity implements io.gomint.entit
     /**
      * Set the position based on the position of the shooter
      */
-    public Location setPositionFromShooter() {
+    Location setPositionFromShooter() {
         // Calculate starting position
         Location position = this.shooter.getLocation();
         position.add(

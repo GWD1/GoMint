@@ -48,4 +48,9 @@ public class ChorusFlower extends Block implements io.gomint.world.block.BlockCh
         return BlockType.CHORUS_FLOWER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -31,4 +31,9 @@ public class SpruceFenceGate extends Block implements io.gomint.world.block.Bloc
         return BlockType.SPRUCE_FENCE_GATE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

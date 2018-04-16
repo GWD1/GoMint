@@ -26,4 +26,9 @@ public class EndBricks extends Block implements io.gomint.world.block.BlockEndBr
         return BlockType.END_BRICKS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

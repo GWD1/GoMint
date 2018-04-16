@@ -64,6 +64,12 @@ public abstract class Form implements io.gomint.gui.Form {
         return obj;
     }
 
+    /**
+     * Parse the given response into the correct listener format
+     *
+     * @param json data from the client
+     * @return correct formatted object for the listener
+     */
     public abstract Object parseResponse( String json );
 
     public void setDirty() {

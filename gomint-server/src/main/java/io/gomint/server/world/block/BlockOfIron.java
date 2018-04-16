@@ -1,8 +1,11 @@
 package io.gomint.server.world.block;
 
+import io.gomint.inventory.item.*;
+import io.gomint.server.registry.RegisterInfo;
 import io.gomint.world.block.BlockType;
 
-import io.gomint.server.registry.RegisterInfo;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author geNAZt
@@ -29,6 +32,27 @@ public class BlockOfIron extends Block implements io.gomint.world.block.BlockBlo
     @Override
     public BlockType getType() {
         return BlockType.BLOCK_OF_IRON;
+    }
+
+    @Override
+    public Class<? extends ItemStack>[] getToolInterfaces() {
+        // Only stone, iron and up
+        return new Class[]{
+            ItemIronPickaxe.class,
+            ItemDiamondPickaxe.class,
+            ItemStonePickaxe.class
+        };
+    }
+
+    @Override
+    public List<ItemStack> getDrops( ItemStack itemInHand ) {
+        if ( isCorrectTool( itemInHand ) ) {
+            return new ArrayList<ItemStack>(){{
+                add( ItemBlockOfIron.create( 1 ) );
+            }};
+        }
+
+        return new ArrayList<>();
     }
 
 }

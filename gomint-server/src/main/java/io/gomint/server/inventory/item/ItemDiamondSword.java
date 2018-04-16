@@ -45,4 +45,9 @@ public class ItemDiamondSword extends ItemReduceTierSpecial implements io.gomint
         return ItemType.DIAMOND_SWORD;
     }
 
+    @Override
+    public int getEnchantAbility() {
+        return 10;
+    }
+
 }

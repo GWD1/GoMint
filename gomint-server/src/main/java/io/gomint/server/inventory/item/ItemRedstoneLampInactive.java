@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 123 )
- public class ItemRedstoneLampInactive extends ItemStack implements io.gomint.inventory.item.ItemRedstoneLampInactive {
+ public class ItemRedstoneLampInactive extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemRedstoneLampInactive( short data, int amount ) {

@@ -7,7 +7,7 @@
 
 package io.gomint.server.config;
 
-import com.blackypaw.simpleconfig.SimpleConfig;
+import io.gomint.config.YamlConfig;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-public class ListenerConfig extends SimpleConfig {
+public class ListenerConfig extends YamlConfig {
 
     private String ip = "0.0.0.0";
     private int port = 19132;

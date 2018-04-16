@@ -2,13 +2,13 @@ package io.gomint.math;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.Getter;
 
 /**
  * @author geNAZt
+ * @version 1.0
  */
-@AllArgsConstructor
 @Data
+@AllArgsConstructor
 public class BlockPosition implements Cloneable {
 
     public static final BlockPosition UP = new BlockPosition( 0, 1, 0 );

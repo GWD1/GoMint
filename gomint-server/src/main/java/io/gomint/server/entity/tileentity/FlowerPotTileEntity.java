@@ -8,23 +8,34 @@
 package io.gomint.server.entity.tileentity;
 
 import io.gomint.entity.Entity;
-import io.gomint.server.inventory.item.ItemStack;
+import io.gomint.math.Location;
 import io.gomint.math.Vector;
 import io.gomint.server.inventory.InventoryHolder;
-import io.gomint.server.inventory.MaterialMagicNumbers;
-import io.gomint.server.inventory.item.Items;
+import io.gomint.server.inventory.item.ItemStack;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.taglib.NBTTagCompound;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.gomint.world.block.BlockFace;
+import lombok.Getter;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
+@Getter
 public class FlowerPotTileEntity extends TileEntity implements InventoryHolder {
 
     private ItemStack holdingItem;
+
+    /**
+     * Create a new flower pot with the item given as content
+     *
+     * @param itemStack which should be inside the flower pot
+     * @param position  of the flower pot
+     */
+    public FlowerPotTileEntity( ItemStack itemStack, Location position ) {
+        super( position );
+        this.holdingItem = itemStack;
+    }
 
     /**
      * Construct new TileEntity from TagCompound
@@ -35,21 +46,11 @@ public class FlowerPotTileEntity extends TileEntity implements InventoryHolder {
     public FlowerPotTileEntity( NBTTagCompound tagCompound, WorldAdapter world ) {
         super( tagCompound, world );
 
-        // This is needed since minecraft changed from storing raw ids to string keys somewhere in 1.7 / 1.8
-        int material = 0;
-        if ( tagCompound.containsKey( "item" ) ) {
-             material = tagCompound.getShort( "item", (short) 0 );
-        } else {
-            try {
-                material = tagCompound.getShort( "Item", (short) 0 );
-            } catch ( ClassCastException e ) {
-                material = MaterialMagicNumbers.valueOfWithId( tagCompound.getString( "Item", "minecraft:air" ) );
-            }
-        }
+        int material = tagCompound.getShort( "item", (short) 0 );
 
         // Skip non existent items for PE
         if ( material == 0 ) {
-            this.holdingItem = Items.create( 0, (short) 0, (byte) 1, null );
+            this.holdingItem = world.getServer().getItems().create( 0, (short) 0, (byte) 1, null );
             return;
         }
 
@@ -58,7 +59,7 @@ public class FlowerPotTileEntity extends TileEntity implements InventoryHolder {
             data = tagCompound.getInteger( "Data", -1 ).shortValue();
         }
 
-        this.holdingItem = Items.create( material, data, (byte) 1, null );
+        this.holdingItem = world.getServer().getItems().create( material, data, (byte) 1, null );
     }
 
     @Override
@@ -67,7 +68,7 @@ public class FlowerPotTileEntity extends TileEntity implements InventoryHolder {
     }
 
     @Override
-    public void interact( Entity entity, int face, Vector facePos, io.gomint.inventory.item.ItemStack item ) {
+    public void interact( Entity entity, BlockFace face, Vector facePos, io.gomint.inventory.item.ItemStack item ) {
 
     }
 

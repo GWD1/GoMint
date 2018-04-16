@@ -36,4 +36,9 @@ public class WoodenDoubleSlab extends Block implements io.gomint.world.block.Blo
         return BlockType.WOODEN_DOUBLE_SLAB;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

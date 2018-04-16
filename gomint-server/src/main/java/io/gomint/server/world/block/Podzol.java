@@ -31,4 +31,9 @@ public class Podzol extends Block implements io.gomint.world.block.BlockPodzol {
         return BlockType.PODZOL;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

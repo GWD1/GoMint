@@ -39,4 +39,11 @@ public class Slider extends Element {
         return obj;
     }
 
+    @Override
+    public Object getAnswer( Object answerOption ) {
+        Double answer = (Double) answerOption;
+        this.defaultValue = answer.floatValue();
+        return answer;
+    }
+
 }

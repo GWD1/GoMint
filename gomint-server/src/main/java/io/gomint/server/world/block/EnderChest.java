@@ -1,5 +1,9 @@
 package io.gomint.server.world.block;
 
+import io.gomint.inventory.Inventory;
+import io.gomint.server.entity.tileentity.TileEntity;
+import io.gomint.taglib.NBTTagCompound;
+import io.gomint.world.block.BlockFace;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.inventory.item.ItemStack;
@@ -13,7 +17,7 @@ import io.gomint.server.registry.RegisterInfo;
  * @version 1.0
  */
 @RegisterInfo( id = 130 )
-public class EnderChest extends Block implements io.gomint.world.block.BlockEnderChest {
+public class EnderChest extends ContainerBlock implements io.gomint.world.block.BlockEnderChest {
 
     @Override
     public int getBlockId() {
@@ -31,7 +35,7 @@ public class EnderChest extends Block implements io.gomint.world.block.BlockEnde
     }
 
     @Override
-    public boolean interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public boolean interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         EnderChestTileEntity tileEntity = this.getTileEntity();
         if ( tileEntity != null ) {
             tileEntity.interact( entity, face, facePos, item );
@@ -49,6 +53,27 @@ public class EnderChest extends Block implements io.gomint.world.block.BlockEnde
     @Override
     public BlockType getType() {
         return BlockType.ENDER_CHEST;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
+    @Override
+    public boolean needsTileEntity() {
+        return true;
+    }
+
+    @Override
+    TileEntity createTileEntity( NBTTagCompound compound ) {
+        return new EnderChestTileEntity( this.location );
+    }
+
+    @Override
+    public Inventory getInventory() {
+        EnderChestTileEntity chestTileEntity = this.getTileEntity();
+        return chestTileEntity.getInventory();
     }
 
 }

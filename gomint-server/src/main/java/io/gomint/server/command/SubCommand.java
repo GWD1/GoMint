@@ -42,7 +42,7 @@ public class SubCommand extends Command {
     }
 
     public void addCommand( Plugin plugin, String subCommandName, CommandHolder holder ) {
-        if ( this.plugin.equals( plugin ) ) {
+        if ( plugin == null || this.plugin.equals( plugin ) ) {
             this.subCommands.put( subCommandName, holder );
         }
     }
@@ -85,21 +85,28 @@ public class SubCommand extends Command {
 
         for ( Map.Entry<String, CommandHolder> entry : this.subCommands.entrySet() ) {
             if ( entry.getValue().getPermission() == null || player.hasPermission( entry.getValue().getPermission() ) ) {
-                for ( CommandOverload commandOverload : entry.getValue().getOverload() ) {
+                if ( entry.getValue().getOverload() != null ) {
+                    for ( CommandOverload commandOverload : entry.getValue().getOverload() ) {
+                        CommandOverload overload = new CommandOverload();
+                        CommandValidator commandValidator = new CommandValidator();
+                        overload.param( entry.getKey(), commandValidator );
+
+                        for ( Map.Entry<String, ParamValidator> validatorEntry : commandOverload.getParameters().entrySet() ) {
+                            overload.param( validatorEntry.getKey(), validatorEntry.getValue() );
+                        }
+
+                        overloads.add( overload );
+                    }
+                } else {
                     CommandOverload overload = new CommandOverload();
                     CommandValidator commandValidator = new CommandValidator();
                     overload.param( entry.getKey(), commandValidator );
-
-                    for ( Map.Entry<String, ParamValidator> validatorEntry : commandOverload.getParameters().entrySet() ) {
-                        overload.param( validatorEntry.getKey(), validatorEntry.getValue() );
-                    }
-
                     overloads.add( overload );
                 }
             }
         }
 
-        if ( overloads.size() > 0 ) {
+        if ( !overloads.isEmpty() ) {
             return new CommandHolder( this.getName(),
                 "Subcommands for command '" + this.getName() + "'",
                 null,

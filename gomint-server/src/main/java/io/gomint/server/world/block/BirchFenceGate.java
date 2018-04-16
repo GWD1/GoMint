@@ -31,4 +31,9 @@ public class BirchFenceGate extends Block implements io.gomint.world.block.Block
         return BlockType.BIRCH_FENCE_GATE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

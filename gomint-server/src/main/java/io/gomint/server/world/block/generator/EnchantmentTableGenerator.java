@@ -1,27 +1,26 @@
+/*
+ * Copyright (c) 2018, GoMint, BlackyPaw and geNAZt
+ *
+ * This code is licensed under the BSD license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 package io.gomint.server.world.block.generator;
 
-import io.gomint.server.world.block.EnchantmentTable;
-import io.gomint.taglib.NBTTagCompound;
-import io.gomint.server.world.WorldAdapter;
-import io.gomint.math.Location;
-import io.gomint.server.entity.tileentity.TileEntity;
-
 /**
- * @author geNAZt
- * @version 1.0
+ * @author generated
+ * @version 2.0
  */
 public class EnchantmentTableGenerator implements BlockGenerator {
 
-   @Override
-   public EnchantmentTable generate( byte blockData, byte skyLightLevel, byte blockLightLevel, TileEntity tileEntity, Location location ) {
-       EnchantmentTable block = generate();
-       block.setData( blockData, tileEntity, (WorldAdapter) location.getWorld(), location, skyLightLevel, blockLightLevel );
-       return block;
-   }
+    public io.gomint.server.world.block.Block generate( int blockId, byte blockData, byte skyLightLevel, byte blockLightLevel, io.gomint.server.entity.tileentity.TileEntity tileEntity, io.gomint.math.Location location ) {
+        io.gomint.server.world.block.Block block = new io.gomint.server.world.block.EnchantmentTable();
+        block.setData( blockId, blockData, tileEntity, (io.gomint.server.world.WorldAdapter) location.getWorld(), location, skyLightLevel, blockLightLevel );
+        return block;
+    }
 
-   @Override
-   public EnchantmentTable generate() {
-       return new EnchantmentTable();
-   }
+    public io.gomint.server.world.block.Block generate() {
+        return new io.gomint.server.world.block.EnchantmentTable();
+    }
 
 }

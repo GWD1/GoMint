@@ -23,7 +23,7 @@ public class PacketResourcePacksInfo extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         buffer.writeBoolean( this.mustAccept );
 
         buffer.writeLShort( (short) ( this.behaviourPackEntries == null ? 0 : this.behaviourPackEntries.size() ) );
@@ -50,7 +50,7 @@ public class PacketResourcePacksInfo extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

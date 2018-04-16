@@ -36,4 +36,9 @@ public class Melon extends Block implements io.gomint.world.block.BlockMelon {
         return BlockType.MELON;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

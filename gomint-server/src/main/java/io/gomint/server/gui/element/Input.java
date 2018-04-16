@@ -8,7 +8,7 @@ import org.json.simple.JSONObject;
  */
 public class Input extends Element {
 
-    private final String defaultValue;
+    private String defaultValue;
     private final String placeHolder;
 
     public Input( String id, String text, String placeHolder, String defaultValue ) {
@@ -26,4 +26,10 @@ public class Input extends Element {
         return obj;
     }
 
+    @Override
+    public Object getAnswer( Object answerOption ) {
+        String answer = (String) answerOption;
+        this.defaultValue = answer;
+        return answer;
+    }
 }

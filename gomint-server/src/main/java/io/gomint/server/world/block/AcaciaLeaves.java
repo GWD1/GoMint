@@ -22,6 +22,11 @@ public class AcaciaLeaves extends Block implements io.gomint.world.block.BlockAc
     }
 
     @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
+    @Override
     public long getBreakTime() {
         return 350;
     }

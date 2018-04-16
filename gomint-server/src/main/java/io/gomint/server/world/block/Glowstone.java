@@ -36,4 +36,8 @@ public class Glowstone extends Block implements io.gomint.world.block.BlockGlows
         return BlockType.GLOWSTONE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
 }

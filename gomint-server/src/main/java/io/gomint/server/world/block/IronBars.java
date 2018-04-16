@@ -36,4 +36,9 @@ public class IronBars extends Block implements io.gomint.world.block.BlockIronBa
         return BlockType.IRON_BARS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

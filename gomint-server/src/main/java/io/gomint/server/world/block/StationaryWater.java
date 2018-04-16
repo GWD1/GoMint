@@ -34,6 +34,16 @@ public class StationaryWater extends Liquid implements BlockStationaryWater {
     }
 
     @Override
+    public int getTickDiff() {
+        return 250;
+    }
+
+    @Override
+    public boolean isFlowing() {
+        return false;
+    }
+
+    @Override
     public float getBlastResistance() {
         return 500.0f;
     }
@@ -41,7 +51,7 @@ public class StationaryWater extends Liquid implements BlockStationaryWater {
     @Override
     public void onEntityStanding( EntityLiving entityLiving ) {
         if ( entityLiving.isOnFire() ) {
-            entityLiving.setFire( 0 );
+            entityLiving.extinguish();
         }
     }
 

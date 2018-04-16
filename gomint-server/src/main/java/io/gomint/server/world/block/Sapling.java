@@ -36,4 +36,9 @@ public class Sapling extends Block implements io.gomint.world.block.BlockSapling
         return BlockType.SAPLING;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -9,12 +9,14 @@ package io.gomint.server.entity.tileentity;
 
 import io.gomint.entity.Entity;
 import io.gomint.inventory.item.ItemStack;
+import io.gomint.math.Location;
 import io.gomint.math.Vector;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.inventory.EnderChestInventory;
 import io.gomint.server.inventory.InventoryHolder;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.taglib.NBTTagCompound;
+import io.gomint.world.block.BlockFace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +27,16 @@ import org.slf4j.LoggerFactory;
 public class EnderChestTileEntity extends ContainerTileEntity implements InventoryHolder {
 
     private EnderChestInventory inventory;
+
+    /**
+     * Create new ender chest based on the position
+     *
+     * @param position where the ender chest should be placed
+     */
+    public EnderChestTileEntity( Location position ) {
+        super( position );
+        this.inventory = new EnderChestInventory( this );
+    }
 
     /**
      * Construct new TileEntity from TagCompound
@@ -43,7 +55,7 @@ public class EnderChestTileEntity extends ContainerTileEntity implements Invento
     }
 
     @Override
-    public void interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public void interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         // Open the chest inventory for the entity
         if ( entity instanceof EntityPlayer ) {
             ( (EntityPlayer) entity ).openInventory( this.inventory );
@@ -55,4 +67,14 @@ public class EnderChestTileEntity extends ContainerTileEntity implements Invento
         super.toCompound( compound );
         compound.addValue( "id", "EnderChest" );
     }
+
+    /**
+     * Get the inventory of this ender chest
+     *
+     * @return
+     */
+    public EnderChestInventory getInventory() {
+        return this.inventory;
+    }
+
 }

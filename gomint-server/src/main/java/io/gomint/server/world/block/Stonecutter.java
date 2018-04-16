@@ -43,4 +43,9 @@ public class Stonecutter extends Block implements io.gomint.world.block.BlockSto
         return BlockType.STONECUTTER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 76 )
- public class ItemRedstoneTorchActive extends ItemStack implements io.gomint.inventory.item.ItemRedstoneTorchActive {
+ public class ItemRedstoneTorchActive extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemRedstoneTorchActive( short data, int amount ) {

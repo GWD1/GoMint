@@ -36,4 +36,9 @@ public class Furnace extends Block implements io.gomint.world.block.BlockFurnace
         return BlockType.FURNACE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

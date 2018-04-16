@@ -125,7 +125,7 @@ public class ArmorInventory extends Inventory implements io.gomint.inventory.Arm
         for ( int i = 0; i < this.contents.length; i++ ) {
             ItemStack itemStack = this.contents[i];
             if ( itemStack instanceof ItemArmor ) {
-                ( (ItemArmor) itemStack ).setData( (short) ( itemStack.getData() + damage ) );
+                itemStack.setData( (short) ( itemStack.getData() + damage ) );
                 this.setItem( i, itemStack );
             }
         }

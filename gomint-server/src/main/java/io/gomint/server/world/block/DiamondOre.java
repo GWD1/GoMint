@@ -31,4 +31,9 @@ public class DiamondOre extends Block implements io.gomint.world.block.BlockDiam
         return BlockType.DIAMOND_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -27,7 +27,7 @@ public class PacketCommandOutput extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         writeCommandOrigin( this.origin, buffer );
         buffer.writeBoolean( this.success );
         buffer.writeUnsignedVarInt( this.outputs.size() );
@@ -43,7 +43,7 @@ public class PacketCommandOutput extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

@@ -31,4 +31,9 @@ public class HayBale extends Block implements io.gomint.world.block.BlockHayBale
         return BlockType.HAY_BALE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

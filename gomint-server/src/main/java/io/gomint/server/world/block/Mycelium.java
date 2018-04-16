@@ -31,4 +31,9 @@ public class Mycelium extends Block implements io.gomint.world.block.BlockMyceli
         return BlockType.MYCELIUM;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

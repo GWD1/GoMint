@@ -36,4 +36,9 @@ public class StoneSlab extends Slab {
         return BlockType.STONE_SLAB;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

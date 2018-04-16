@@ -36,4 +36,9 @@ public class Trapdoor extends Block implements io.gomint.world.block.BlockTrapdo
         return BlockType.TRAPDOOR;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

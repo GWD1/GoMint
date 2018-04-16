@@ -16,10 +16,14 @@ public class StandingBanner extends Banner {
         return 176;
     }
 
-
     @Override
     public BlockType getType() {
         return BlockType.STANDING_BANNER;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

@@ -9,7 +9,7 @@ import io.gomint.server.registry.RegisterInfo;
  * @version 1.0
  */
 @RegisterInfo( id = 71 )
-public class IronDoor extends Door {
+public class IronDoor extends Door implements io.gomint.world.block.BlockIronDoor {
 
     @Override
     public int getBlockId() {
@@ -29,6 +29,11 @@ public class IronDoor extends Door {
     @Override
     public BlockType getType() {
         return BlockType.IRON_DOOR;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

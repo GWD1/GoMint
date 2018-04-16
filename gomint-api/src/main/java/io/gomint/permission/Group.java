@@ -7,7 +7,8 @@
 
 package io.gomint.permission;
 
-import com.koloboke.collect.map.ObjObjCursor;
+import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 /**
  * @author geNAZt
@@ -43,6 +44,6 @@ public interface Group {
      *
      * @return new iterator for this group
      */
-    ObjObjCursor<String, Boolean> cursor();
+    ObjectSet<Object2BooleanMap.Entry<String>> cursor();
 
 }

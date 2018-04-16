@@ -7,12 +7,10 @@
 
 package io.gomint.math;
 
+
+import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.ToString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -27,6 +25,7 @@ import org.slf4j.LoggerFactory;
  */
 @EqualsAndHashCode
 @ToString
+@Data
 public class Vector implements Cloneable {
 
     public static final Vector ZERO = new Vector( 0, 0, 0 );
@@ -39,14 +38,8 @@ public class Vector implements Cloneable {
     public static final Vector NORTH = new Vector( 0, 0, -1 );
     public static final Vector SOUTH = new Vector( 0, 0, 1 );
 
-    @Getter
-    @Setter
     protected float x;
-    @Getter
-    @Setter
     protected float y;
-    @Getter
-    @Setter
     protected float z;
 
     public Vector() {

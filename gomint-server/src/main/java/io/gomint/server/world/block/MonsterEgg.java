@@ -31,4 +31,9 @@ public class MonsterEgg extends Block implements io.gomint.world.block.BlockMons
         return BlockType.MONSTER_EGG;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

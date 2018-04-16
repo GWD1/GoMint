@@ -31,4 +31,9 @@ public class CoalOre extends Block implements io.gomint.world.block.BlockCoalOre
         return BlockType.COAL_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

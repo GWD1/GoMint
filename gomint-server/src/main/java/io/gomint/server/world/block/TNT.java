@@ -8,6 +8,7 @@ import io.gomint.server.entity.Entity;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.entity.active.EntityPrimedTNT;
 import io.gomint.server.registry.RegisterInfo;
+import io.gomint.world.block.BlockFace;
 import io.gomint.world.block.BlockTNT;
 import io.gomint.world.block.BlockType;
 
@@ -29,7 +30,7 @@ public class TNT extends Block implements BlockTNT {
     }
 
     @Override
-    public boolean interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public boolean interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         if ( entity instanceof EntityPlayer && item instanceof ItemFlintAndSteel ) {
             EntityPlayer player = (EntityPlayer) entity;
             io.gomint.server.inventory.item.ItemStack itemStack = (io.gomint.server.inventory.item.ItemStack) item;
@@ -65,6 +66,11 @@ public class TNT extends Block implements BlockTNT {
     @Override
     public BlockType getType() {
         return BlockType.TNT;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

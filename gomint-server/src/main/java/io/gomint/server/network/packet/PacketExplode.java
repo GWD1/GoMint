@@ -33,7 +33,7 @@ public class PacketExplode extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         writeVector( this.source, buffer );
         buffer.writeSignedVarInt( (int) ( this.radius * 32f ) );
         buffer.writeUnsignedVarInt( ( this.affectedBlocksRelative != null ) ? this.affectedBlocksRelative.size() : 0 );
@@ -45,7 +45,7 @@ public class PacketExplode extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

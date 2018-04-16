@@ -46,4 +46,9 @@ public class DeadBush extends Block implements io.gomint.world.block.BlockDeadBu
         return BlockType.DEAD_BUSH;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

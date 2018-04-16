@@ -1,10 +1,15 @@
 package io.gomint.server.world.block;
 
+import io.gomint.inventory.item.ItemDirt;
+import io.gomint.inventory.item.ItemStack;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.math.BlockPosition;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.server.world.UpdateReason;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author geNAZt
@@ -45,4 +50,15 @@ public class GrassBlock extends Block implements io.gomint.world.block.BlockGras
         return BlockType.GRASS_BLOCK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
+    @Override
+    public List<ItemStack> getDrops( ItemStack itemInHand ) {
+        return new ArrayList<ItemStack>(){{
+            add( ItemDirt.create( 1 ) );
+        }};
+    }
 }

@@ -7,25 +7,33 @@
 
 package io.gomint.server.network;
 
-import com.koloboke.collect.LongCursor;
-import com.koloboke.function.LongObjConsumer;
 import io.gomint.event.network.PingEvent;
 import io.gomint.event.player.PlayerPreLoginEvent;
-import io.gomint.jraknet.*;
+import io.gomint.jraknet.Connection;
+import io.gomint.jraknet.EventLoops;
+import io.gomint.jraknet.PacketBuffer;
+import io.gomint.jraknet.ServerSocket;
+import io.gomint.jraknet.SocketEvent;
 import io.gomint.server.GoMintServer;
-import io.gomint.server.network.tcp.ConnectionHandler;
 import io.gomint.server.network.tcp.Initializer;
-import io.gomint.server.util.collection.GUIDSet;
-import io.gomint.server.util.collection.PlayerConnectionMap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.util.ResourceLeakDetector;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.Queue;
@@ -33,7 +41,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
 /**
  * @author BlackyPaw
@@ -46,9 +53,9 @@ public class NetworkManager {
     private final GoMintServer server;
 
     // Connections which were closed and should be removed during next tick:
-    private final GUIDSet closedConnections = GUIDSet.withExpectedSize( 5 );
+    private final LongSet closedConnections = new LongOpenHashSet();
     private ServerSocket socket;
-    private PlayerConnectionMap playersByGuid = PlayerConnectionMap.withExpectedSize( 20 );
+    private Long2ObjectMap<PlayerConnection> playersByGuid = new Long2ObjectOpenHashMap<>();
 
     // TCP listener
     private ServerBootstrap tcpListener;
@@ -64,18 +71,9 @@ public class NetworkManager {
     private File dumpDirectory;
 
     // Motd
-    @Getter @Setter
+    @Getter
+    @Setter
     private String motd;
-
-    // Internal ticking
-    private long currentTickMillis;
-    private float lastTickTime;
-    private final LongObjConsumer<PlayerConnection> connectionConsumer = new LongObjConsumer<PlayerConnection>() {
-        @Override
-        public void accept( long l, PlayerConnection connection ) {
-            connection.update( currentTickMillis, lastTickTime );
-        }
-    };
 
     // Post process service
     @Getter
@@ -107,31 +105,24 @@ public class NetworkManager {
 
         // Check which listener to use
         if ( this.server.getServerConfig().getListener().isUseTCP() ) {
-            this.tcpListener = Initializer.buildServerBootstrap( new Consumer<ConnectionHandler>() {
-                @Override
-                public void accept( ConnectionHandler connectionHandler ) {
-                    PlayerPreLoginEvent playerPreLoginEvent = getServer().getPluginManager().callEvent(
-                        new PlayerPreLoginEvent( (InetSocketAddress) connectionHandler.getChannel().remoteAddress() )
-                    );
+            this.tcpListener = Initializer.buildServerBootstrap( connectionHandler -> {
+                PlayerPreLoginEvent playerPreLoginEvent = getServer().getPluginManager().callEvent(
+                    new PlayerPreLoginEvent( (InetSocketAddress) connectionHandler.getChannel().remoteAddress() )
+                );
 
-                    if ( playerPreLoginEvent.isCancelled() ) {
-                        connectionHandler.disconnect();
-                        return;
-                    }
-
-                    PlayerConnection playerConnection = new PlayerConnection( NetworkManager.this, null,
-                        connectionHandler, PlayerConnectionState.HANDSHAKE );
-                    playerConnection.setTcpId( idCounter.incrementAndGet() );
-
-                    incomingConnections.offer( playerConnection );
-
-                    connectionHandler.whenDisconnected( new Consumer<Void>() {
-                        @Override
-                        public void accept( Void aVoid ) {
-                            handleConnectionClosed( playerConnection.getId() );
-                        }
-                    } );
+                if ( playerPreLoginEvent.isCancelled() ) {
+                    connectionHandler.disconnect();
+                    return;
                 }
+
+                PlayerConnection playerConnection = new PlayerConnection( NetworkManager.this, null,
+                    connectionHandler, PlayerConnectionState.HANDSHAKE );
+                playerConnection.setTcpId( idCounter.incrementAndGet() );
+
+                incomingConnections.offer( playerConnection );
+
+                connectionHandler.onPing( playerConnection::setTcpPing );
+                connectionHandler.whenDisconnected( aVoid -> handleConnectionClosed( playerConnection.getId() ) );
             } );
 
             this.tcpChannel = this.tcpListener.bind( host, port ).syncUninterruptibly().channel();
@@ -141,19 +132,9 @@ public class NetworkManager {
                 throw new IllegalStateException( "Cannot re-initialize network manager" );
             }
 
-            System.setProperty( "java.net.preferIPv4Stack", "true" );               // We currently don't use ipv6
-            System.setProperty( "io.netty.selectorAutoRebuildThreshold", "0" );     // Never rebuild selectors
-            ResourceLeakDetector.setLevel( ResourceLeakDetector.Level.DISABLED );   // Eats performance
-
-            this.socket = new ServerSocket( maxConnections );
+            this.socket = new ServerSocket( LOGGER, maxConnections );
             this.socket.setMojangModificationEnabled( true );
-            this.socket.setEventLoopFactory( this.server.getThreadFactory() );
-            this.socket.setEventHandler( new SocketEventHandler() {
-                @Override
-                public void onSocketEvent( Socket socket, SocketEvent socketEvent ) {
-                    NetworkManager.this.handleSocketEvent( socketEvent );
-                }
-            } );
+            this.socket.setEventHandler( ( socket, socketEvent ) -> NetworkManager.this.handleSocketEvent( socketEvent ) );
             this.socket.bind( host, port );
         }
     }
@@ -187,14 +168,12 @@ public class NetworkManager {
         // Handle updates to player map:
         while ( !this.incomingConnections.isEmpty() ) {
             PlayerConnection connection = this.incomingConnections.poll();
-            this.playersByGuid.justPut( connection.getId(), connection );
+            this.playersByGuid.put( connection.getId(), connection );
         }
 
         synchronized ( this.closedConnections ) {
             if ( !this.closedConnections.isEmpty() ) {
-                LongCursor cursor = this.closedConnections.cursor();
-                while ( cursor.moveNext() ) {
-                    long guid = cursor.elem();
+                for ( long guid : this.closedConnections ) {
                     PlayerConnection connection = this.playersByGuid.remove( guid );
                     if ( connection != null ) {
                         connection.close();
@@ -206,9 +185,9 @@ public class NetworkManager {
         }
 
         // Tick all player connections in order to receive all incoming packets:
-        this.currentTickMillis = currentMillis;
-        this.lastTickTime = lastTickTime;
-        this.playersByGuid.forEach( this.connectionConsumer );
+        for ( Long2ObjectMap.Entry<PlayerConnection> entry : this.playersByGuid.long2ObjectEntrySet() ) {
+            entry.getValue().update( currentMillis, lastTickTime );
+        }
     }
 
     /**
@@ -219,12 +198,16 @@ public class NetworkManager {
             this.socket.close();
             this.socket = null;
 
-            this.playersByGuid.forEach( new LongObjConsumer<PlayerConnection>() {
-                @Override
-                public void accept( long l, PlayerConnection playerConnection ) {
-                    playerConnection.close();
-                }
-            } );
+            for ( Long2ObjectMap.Entry<PlayerConnection> entry : this.playersByGuid.long2ObjectEntrySet() ) {
+                entry.getValue().close();
+            }
+
+            // Close the jRaknet EventLoops, we don't need them anymore
+            try {
+                EventLoops.LOOP_GROUP.shutdownGracefully().await();
+            } catch ( InterruptedException e ) {
+                LOGGER.error( "Could not shutdown jRaknet loop: ", e );
+            }
         }
 
         if ( this.tcpListener != null ) {
@@ -268,7 +251,7 @@ public class NetworkManager {
         switch ( event.getType() ) {
             case NEW_INCOMING_CONNECTION:
                 PlayerPreLoginEvent playerPreLoginEvent = this.getServer().getPluginManager().callEvent(
-                        new PlayerPreLoginEvent( event.getConnection().getAddress() )
+                    new PlayerPreLoginEvent( event.getConnection().getAddress() )
                 );
 
                 if ( playerPreLoginEvent.isCancelled() ) {
@@ -298,11 +281,11 @@ public class NetworkManager {
     private void handleUnconnectedPing( SocketEvent event ) {
         // Fire ping event so plugins can modify the motd and player amounts
         PingEvent pingEvent = this.server.getPluginManager().callEvent(
-                new PingEvent(
-                    this.server.getMotd(),
-                    this.server.getAmountOfPlayers(),
-                    this.server.getServerConfig().getMaxPlayers()
-                )
+            new PingEvent(
+                this.server.getMotd(),
+                this.server.getAmountOfPlayers(),
+                this.server.getServerConfig().getMaxPlayers()
+            )
         );
 
         event.getPingPongInfo().setMotd( "MCPE;" + pingEvent.getMotd() + ";" + Protocol.MINECRAFT_PE_PROTOCOL_VERSION +

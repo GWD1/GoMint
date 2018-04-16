@@ -31,4 +31,9 @@ public class MossyCobblestone extends Block implements io.gomint.world.block.Blo
         return BlockType.MOSSY_COBBLESTONE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

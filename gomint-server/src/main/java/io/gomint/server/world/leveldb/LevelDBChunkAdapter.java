@@ -7,13 +7,25 @@
 
 package io.gomint.server.world.leveldb;
 
+import io.gomint.jraknet.PacketBuffer;
 import io.gomint.math.BlockPosition;
+import io.gomint.server.entity.Entity;
+import io.gomint.server.entity.tileentity.TileEntities;
+import io.gomint.server.entity.tileentity.TileEntity;
+import io.gomint.server.inventory.MaterialMagicNumbers;
+import io.gomint.server.util.DumpUtil;
+import io.gomint.server.util.Pair;
+import io.gomint.server.util.Palette;
 import io.gomint.server.world.ChunkAdapter;
 import io.gomint.server.world.NibbleArray;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.server.world.postprocessor.PistonPostProcessor;
 import io.gomint.taglib.NBTReader;
 import io.gomint.taglib.NBTTagCompound;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -26,15 +38,25 @@ import java.nio.ByteOrder;
  */
 public class LevelDBChunkAdapter extends ChunkAdapter {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger( LevelDBChunkAdapter.class );
+    private int chunkVersion;
+
     /**
      * Create a new level db backed chunk
      *
      * @param worldAdapter which loaded this chunk
      * @param x            position of chunk
      * @param z            position of chunk
+     * @param chunkVersion version of this chunk
      */
+    public LevelDBChunkAdapter( WorldAdapter worldAdapter, int x, int z, byte chunkVersion ) {
+        super( worldAdapter, x, z );
+        this.chunkVersion = chunkVersion;
+    }
+
     public LevelDBChunkAdapter( WorldAdapter worldAdapter, int x, int z ) {
         super( worldAdapter, x, z );
+        this.chunkVersion = 7;
     }
 
     /**
@@ -64,52 +86,107 @@ public class LevelDBChunkAdapter extends ChunkAdapter {
     }
 
     void loadSection( int sectionY, byte[] chunkData ) {
-        ByteBuffer buf = ByteBuffer.wrap( chunkData );
+        PacketBuffer buffer = new PacketBuffer( chunkData, 0 );
 
         // First byte is chunk section version
-        buf.get();
+        byte subchunkVersion = buffer.readByte();
+        switch ( subchunkVersion ) {
+            case 1:
+                byte data = buffer.readByte();
+                boolean isPersistent = ( ( data >> 8 ) & 1 ) != 1; // last bit is the isPresent state (shift and mask it to 1)
+                byte wordTemplate = (byte) ( data >>> 1 ); // Get rid of the last bit (which seems to be the isPresent state)
 
-        // Next 4096 bytes are block data
-        byte[] blockData = new byte[4096];
-        buf.get( blockData );
+                Palette palette = new Palette( buffer, wordTemplate, true );
+                short[] indexes = palette.getIndexes();
 
-        // Next 2048 bytes are metadata
-        byte[] metaData = new byte[2048];
-        buf.get( metaData );
-        NibbleArray meta = new NibbleArray( metaData );
+                // Read NBT data
+                Int2ObjectMap<Pair<Byte, Byte>> chunkPalette = new Int2ObjectOpenHashMap<>( buffer.readLInt() ); // Varint my ass
 
-        for ( int j = 0; j < 16; ++j ) {
-            for ( int i = 0; i < 16; ++i ) {
-                for ( int k = 0; k < 16; ++k ) {
-                    int y = ( sectionY << 4 ) + j;
-                    short blockIndex = (short) ( k << 8 | i << 4 | j ); // j k i - k j i - i k j -
-                    byte blockId = blockData[blockIndex];
-                    this.setBlock( k, y, i, blockId );
+                int index = 0;
+                NBTReader reader = new NBTReader( new ByteArrayInputStream( buffer.getBuffer(), buffer.getPosition(), buffer.getRemaining() ), ByteOrder.LITTLE_ENDIAN );
+                while ( reader.hasMoreToRead() ) {
+                    try {
+                        NBTTagCompound compound = reader.parse();
+                        byte blockId = (byte) MaterialMagicNumbers.valueOfWithId( compound.getString( "name", "minecraft:air" ) );
+                        byte blockData = compound.getShort( "val", (short) 0 ).byteValue();
 
-                    if ( meta.get( blockIndex ) != 0 ) {
-                        this.setData( k, y, i, meta.get( blockIndex ) );
-                    }
-
-                    switch ( blockId ) {
-                        case 29:
-                        case 33: // Piston head
-                            BlockPosition position = new BlockPosition( ( this.x << 4 ) + k, y , ( this.z << 4 ) + i );
-                            this.postProcessors.offer( new PistonPostProcessor( this.world, position ) );
-                            break;
+                        chunkPalette.put( index++, new Pair<>( blockId, blockData ) );
+                    } catch ( IOException e ) {
+                        LOGGER.error( "Error in loading tile entities", e );
+                        break;
                     }
                 }
-            }
+
+                for ( int j = 0; j < 16; ++j ) {
+                    for ( int i = 0; i < 16; ++i ) {
+                        for ( int k = 0; k < 16; ++k ) {
+                            int y = ( sectionY << 4 ) + j;
+                            short blockIndex = (short) ( k << 8 | i << 4 | j ); // j k i - k j i - i k j -
+
+                            Pair<Byte, Byte> dataPair = chunkPalette.get( indexes[blockIndex] );
+                            this.setBlock( k, y, i, dataPair.getFirst() );
+                            this.setData( k, y, i, dataPair.getSecond() );
+                        }
+                    }
+                }
+
+                break;
+
+            case 0:
+                // Next 4096 bytes are block data
+                byte[] blockData = new byte[4096];
+                buffer.readBytes( blockData );
+
+                // Next 2048 bytes are metadata
+                byte[] metaData = new byte[2048];
+                buffer.readBytes( metaData );
+                NibbleArray meta = new NibbleArray( metaData );
+
+                // In older versions of the chunk there are light values saved
+                if ( this.chunkVersion < 4 ) {
+                    // TODO: Get skylight data and check if its correct
+                }
+
+                for ( int j = 0; j < 16; ++j ) {
+                    for ( int i = 0; i < 16; ++i ) {
+                        for ( int k = 0; k < 16; ++k ) {
+                            int y = ( sectionY << 4 ) + j;
+                            short blockIndex = (short) ( k << 8 | i << 4 | j ); // j k i - k j i - i k j -
+                            byte blockId = blockData[blockIndex];
+                            this.setBlock( k, y, i, blockId );
+
+                            if ( meta.get( blockIndex ) != 0 ) {
+                                this.setData( k, y, i, meta.get( blockIndex ) );
+                            }
+
+                            switch ( blockId ) {
+                                case 29:
+                                case 33: // Piston head
+                                    BlockPosition position = new BlockPosition( ( this.x << 4 ) + k, y, ( this.z << 4 ) + i );
+                                    this.postProcessors.offer( new PistonPostProcessor( this.world, position ) );
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                }
         }
     }
 
     void loadTileEntities( byte[] tileEntityData ) {
         ByteArrayInputStream bais = new ByteArrayInputStream( tileEntityData );
         NBTReader nbtReader = new NBTReader( bais, ByteOrder.LITTLE_ENDIAN );
-        while ( true ) {
+        while ( nbtReader.hasMoreToRead() ) {
             try {
                 NBTTagCompound compound = nbtReader.parse();
-                this.addTileEntity( compound );
+
+                TileEntity tileEntity = TileEntities.construct( compound, this.world );
+                if ( tileEntity != null ) {
+                    this.addTileEntity( tileEntity );
+                }
             } catch ( IOException e ) {
+                LOGGER.error( "Error in loading tile entities", e );
                 break;
             }
         }
@@ -117,12 +194,18 @@ public class LevelDBChunkAdapter extends ChunkAdapter {
 
     void loadEntities( byte[] entityData ) {
         ByteArrayInputStream bais = new ByteArrayInputStream( entityData );
-        while ( bais.available() > 0 ) {
+        NBTReader nbtReader = new NBTReader( bais, ByteOrder.LITTLE_ENDIAN );
+        while ( nbtReader.hasMoreToRead() ) {
             try {
-                NBTTagCompound nbtTagCompound = NBTTagCompound.readFrom( bais, false, ByteOrder.LITTLE_ENDIAN );
-                // DumpUtil.dumpNBTCompund( nbtTagCompound );
+                NBTTagCompound compound = nbtReader.parse();
+                Integer id = compound.getInteger( "id", 0 );
+                Entity entity = this.world.getServer().getEntities().create( id & 0xFF );
+                if ( entity != null ) {
+                    entity.initFromNBT( compound );
+                }
             } catch ( IOException e ) {
-                e.printStackTrace();
+                LOGGER.error( "Error in loading entities", e );
+                break;
             }
         }
     }

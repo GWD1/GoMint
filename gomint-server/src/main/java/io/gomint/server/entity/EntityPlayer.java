@@ -7,17 +7,31 @@
 
 package io.gomint.server.entity;
 
-import com.koloboke.collect.ObjCursor;
-import com.koloboke.collect.map.ByteObjCursor;
+import io.gomint.GoMint;
+import io.gomint.command.CommandOutput;
+import io.gomint.command.CommandOverload;
+import io.gomint.command.ParamValidator;
+import io.gomint.enchant.EnchantmentKnockback;
+import io.gomint.enchant.EnchantmentSharpness;
 import io.gomint.entity.ChatType;
 import io.gomint.entity.Entity;
+import io.gomint.entity.potion.PotionEffect;
 import io.gomint.event.entity.EntityDamageByEntityEvent;
 import io.gomint.event.entity.EntityDamageEvent;
+import io.gomint.event.entity.EntityTeleportEvent;
+import io.gomint.event.inventory.InventoryCloseEvent;
+import io.gomint.event.inventory.InventoryOpenEvent;
 import io.gomint.event.player.*;
 import io.gomint.gui.*;
 import io.gomint.math.*;
 import io.gomint.math.Vector;
+import io.gomint.player.DeviceInfo;
+import io.gomint.server.GoMintServer;
+import io.gomint.server.command.CommandCanidate;
+import io.gomint.server.command.CommandHolder;
+import io.gomint.server.enchant.EnchantmentProcessor;
 import io.gomint.server.entity.metadata.MetadataContainer;
+import io.gomint.server.entity.passive.EntityHuman;
 import io.gomint.server.entity.projectile.EntityFishingHook;
 import io.gomint.server.inventory.*;
 import io.gomint.server.inventory.item.ItemAir;
@@ -25,28 +39,29 @@ import io.gomint.server.inventory.item.ItemStack;
 import io.gomint.server.network.PlayerConnection;
 import io.gomint.server.network.PlayerConnectionState;
 import io.gomint.server.network.packet.*;
+import io.gomint.server.network.tcp.protocol.SendPlayerToServerPacket;
+import io.gomint.server.performance.LoginPerformance;
 import io.gomint.server.permission.PermissionManager;
 import io.gomint.server.player.EntityVisibilityManager;
-import io.gomint.server.player.PlayerSkin;
 import io.gomint.server.util.EnumConnectors;
-import io.gomint.server.util.collection.*;
 import io.gomint.server.world.ChunkAdapter;
-import io.gomint.server.world.CoordinateUtils;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.server.world.block.Block;
-import io.gomint.world.Gamemode;
-import io.gomint.world.Sound;
-import io.gomint.world.SoundData;
-import lombok.EqualsAndHashCode;
+import io.gomint.world.*;
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ByteMap;
+import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The entity implementation for players. Players are considered living entities even though they
@@ -58,25 +73,15 @@ import java.util.concurrent.LinkedBlockingQueue;
  * @author BlackyPaw
  * @version 1.0
  */
-@EqualsAndHashCode( callSuper = false, of = { "uuid" } )
-@ToString( of = { "username" } )
 public class EntityPlayer extends EntityHuman implements io.gomint.entity.EntityPlayer, InventoryHolder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( EntityPlayer.class );
 
     private final PlayerConnection connection;
     private int viewDistance = 4;
-    @Getter
-    private int neededChunksForSpawn;
-    private Queue<ChunkAdapter> chunkSendQueue = new LinkedBlockingQueue<>();
+    private Queue<ChunkAdapter> chunkSendQueue = new ConcurrentLinkedQueue<>();
 
     // EntityPlayer Information
-    private String username;
-    private String displayName;
-    private UUID uuid;
-    private String xboxId;
-    @Setter
-    private PlayerSkin skin;
     private Gamemode gamemode = Gamemode.SURVIVAL;
     @Getter
     private AdventureSettings adventureSettings;
@@ -91,18 +96,33 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     private Locale locale;
 
     // Hidden players
-    private HiddenPlayerSet hiddenPlayers;
+    private Set<Long> hiddenPlayers;
+
+    // Container handling
+    private Byte2ObjectMap<ContainerInventory> windowIds;
+    private Object2ByteMap<ContainerInventory> containerIds;
 
     // Inventory
-    private PlayerInventory inventory;
-    private ArmorInventory armorInventory;
-    private Inventory craftingInventory;
     private Inventory cursorInventory;
     private Inventory offhandInventory;
+
+    // Crafting
+    @Getter
+    private Inventory craftingInventory;
+    @Getter
     private Inventory craftingInputInventory;
+    @Getter
     private Inventory craftingResultInventory;
-    private ContainerObjectMap windowIds;
-    private ContainerIDMap containerIds;
+
+    // Enchantment table
+    @Setter
+    @Getter
+    private EnchantmentTableInventory enchantmentInputInventory;
+    @Getter
+    private Inventory enchantmentOutputInventory;
+    @Setter
+    @Getter
+    private EnchantmentProcessor enchantmentProcessor;
 
     // Block break data
     @Setter
@@ -117,15 +137,18 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
     // Update data
     @Getter
-    private Queue<BlockPosition> blockUpdates = new ConcurrentLinkedQueue<>();
+    private Set<BlockPosition> blockUpdates = new HashSet<>();
     @Getter
     @Setter
     private Location teleportPosition = null;
 
     // Form stuff
     private int formId;
-    private FormIDMap forms = FormIDMap.withExpectedSize( 2 );
-    private FormListenerIDMap formListeners = FormListenerIDMap.withExpectedSize( 2 );
+    private Int2ObjectMap<io.gomint.server.gui.Form> forms = new Int2ObjectOpenHashMap<>();
+    private Int2ObjectMap<io.gomint.server.gui.FormListener> formListeners = new Int2ObjectOpenHashMap<>();
+
+    // Server settings
+    private int serverSettingsForm = -1;
 
     // Entity data
     @Getter
@@ -133,13 +156,16 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     private EntityFishingHook fishingHook;
     private long lastPickupXP;
 
-    // Bow ticking
+    // Item usage ticking
     @Getter
-    @Setter
-    private long startBow = -1;
+    private long actionStart = -1;
 
     // Exp
     private int xp;
+
+    // Performance metrics
+    @Getter
+    private LoginPerformance loginPerformance;
 
     /**
      * Constructs a new player entity which will be spawned inside the specified world.
@@ -159,29 +185,15 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
                          Locale locale ) {
         super( EntityType.PLAYER, world );
         this.connection = connection;
-        this.username = username;
-        this.displayName = username;
-        this.xboxId = xboxId;
-        this.uuid = uuid;
+
+        // EntityHuman stuff
+        this.setPlayerData( username, username, xboxId, uuid );
+
         this.locale = locale;
         this.adventureSettings = new AdventureSettings( this );
-        this.setSize( 0.6f, 1.8f );
-        this.eyeHeight = 1.62f;
-        this.stepHeight = 0.6f;
-        this.initAttributes();
 
-        this.setNameTagAlwaysVisible( true );
-        this.setCanClimb( true );
-
-        this.metadataContainer.putString( MetadataContainer.DATA_NAMETAG, this.username );
-    }
-
-    private void initAttributes() {
-        addAttribute( Attribute.HUNGER );
-        addAttribute( Attribute.SATURATION );
-        addAttribute( Attribute.EXHAUSTION );
-        addAttribute( Attribute.EXPERIENCE_LEVEL );
-        addAttribute( Attribute.EXPERIENCE );
+        // Performance stuff
+        this.loginPerformance = new LoginPerformance();
     }
 
     // ==================================== ACCESSORS ==================================== //
@@ -198,10 +210,17 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
     @Override
     public void transfer( String host, int port ) {
-        PacketTransfer packetTransfer = new PacketTransfer();
-        packetTransfer.setAddress( host );
-        packetTransfer.setPort( port );
-        this.connection.addToSendQueue( packetTransfer );
+        if ( this.world.getServer().getServerConfig().getListener().isUseTCP() ) {
+            SendPlayerToServerPacket sendPlayerToServerPacket = new SendPlayerToServerPacket();
+            sendPlayerToServerPacket.setHost( host );
+            sendPlayerToServerPacket.setPort( port );
+            this.connection.getConnectionHandler().send( sendPlayerToServerPacket );
+        } else {
+            PacketTransfer packetTransfer = new PacketTransfer();
+            packetTransfer.setAddress( host );
+            packetTransfer.setPort( port );
+            this.connection.addToSendQueue( packetTransfer );
+        }
     }
 
     @Override
@@ -218,8 +237,13 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         int tempViewDistance = Math.min( viewDistance, this.world.getConfig().getViewDistance() );
         if ( this.viewDistance != tempViewDistance ) {
             this.viewDistance = tempViewDistance;
-            this.connection.onViewDistanceChanged();
         }
+
+        if ( this.connection.getState() != PlayerConnectionState.PLAYING ) {
+            this.getLoginPerformance().setChunkStart( this.world.getServer().getCurrentTickTime() );
+        }
+
+        this.connection.onViewDistanceChanged();
     }
 
     /**
@@ -229,16 +253,6 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      */
     public PlayerConnection getConnection() {
         return this.connection;
-    }
-
-    @Override
-    public String getName() {
-        return this.username;
-    }
-
-    @Override
-    public UUID getUUID() {
-        return this.uuid;
     }
 
     @Override
@@ -254,6 +268,32 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         packetSetGamemode.setGameMode( gameModeNumber == 1 ? 1 : 0 );
         this.connection.send( packetSetGamemode );
 
+        this.sendAdventureSettings();
+
+        // Set fly
+        if ( this.gamemode == Gamemode.SPECTATOR || this.gamemode == Gamemode.CREATIVE ) {
+            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.CAN_FLY, true );
+        } else {
+            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.CAN_FLY, false );
+        }
+
+        // Set invis
+        if ( this.gamemode == Gamemode.SPECTATOR ) {
+            this.setInvisible( true );
+        } else {
+            // Check for invis potion effect
+            if ( !this.hasEffect( PotionEffect.INVISIBILITY ) ) {
+                this.setInvisible( false );
+            }
+        }
+    }
+
+    /**
+     * Send adventure settings based on the gamemode
+     */
+    public void sendAdventureSettings() {
+        int gameModeNumber = EnumConnectors.GAMEMODE_CONNECTOR.convert( this.gamemode ).getMagicNumber();
+
         // Recalc adventure settings
         this.adventureSettings.setWorldImmutable( gameModeNumber == 0x03 );
         this.adventureSettings.setCanFly( ( gameModeNumber & 0x01 ) > 0 );
@@ -263,20 +303,6 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         this.adventureSettings.setAttackPlayers( gameModeNumber < 0x02 );
         this.adventureSettings.setNoPvP( gameModeNumber == 0x03 );
         this.adventureSettings.update();
-
-        // Set fly
-        if ( this.gamemode == Gamemode.SPECTATOR || this.gamemode == Gamemode.CREATIVE ) {
-            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.CAN_FLY, true );
-        } else { // TODO: Check for API set fly flag
-            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.CAN_FLY, false );
-        }
-
-        // Set invis
-        if ( this.gamemode == Gamemode.SPECTATOR ) {
-            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.INVISIBLE, true );
-        } else { // TODO: Check for invis effect
-            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.INVISIBLE, false );
-        }
     }
 
     @Override
@@ -291,10 +317,16 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
     @Override
     public void hidePlayer( io.gomint.entity.EntityPlayer player ) {
+        // Never hide myself (client crashes when this is done)
+        if ( player.equals( this ) ) {
+            LOGGER.warn( "You can't hide a player itself. Please tell the plugin author to remove the hidePlayer call" );
+            return;
+        }
+
         EntityPlayer other = (EntityPlayer) player;
 
         if ( this.hiddenPlayers == null ) {
-            this.hiddenPlayers = HiddenPlayerSet.withExpectedSize( 5 );
+            this.hiddenPlayers = new HashSet<>();
         }
 
         this.hiddenPlayers.add( other.getEntityId() );
@@ -308,7 +340,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         PacketPlayerlist packetPlayerlist = new PacketPlayerlist();
         packetPlayerlist.setMode( (byte) 1 );
         packetPlayerlist.setEntries( new ArrayList<PacketPlayerlist.Entry>() {{
-            add( new PacketPlayerlist.Entry( other.getUUID(), other.getEntityId(), null, null, null ) );
+            add( new PacketPlayerlist.Entry( other ) );
         }} );
         getConnection().addToSendQueue( packetPlayerlist );
     }
@@ -319,14 +351,14 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
             return;
         }
 
-        if ( this.hiddenPlayers.removeLong( player.getEntityId() ) ) {
+        if ( this.hiddenPlayers.remove( player.getEntityId() ) ) {
             EntityPlayer other = (EntityPlayer) player;
 
             // Send tablist and spawn packet
             PacketPlayerlist packetPlayerlist = new PacketPlayerlist();
             packetPlayerlist.setMode( (byte) 0 );
             packetPlayerlist.setEntries( new ArrayList<PacketPlayerlist.Entry>() {{
-                add( new PacketPlayerlist.Entry( other.getUUID(), other.getEntityId(), other.getDisplayName(), other.getXboxID(), other.getSkin() ) );
+                add( new PacketPlayerlist.Entry( other ) );
             }} );
             getConnection().addToSendQueue( packetPlayerlist );
             getConnection().addToSendQueue( other.createSpawnPacket() );
@@ -338,35 +370,46 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         return this.hiddenPlayers != null && this.hiddenPlayers.contains( player.getEntityId() );
     }
 
-    @Override
-    public io.gomint.player.PlayerSkin getSkin() {
-        return this.skin;
-    }
+    public void teleport( Location to, EntityTeleportEvent.Cause cause ) {
+        EntityTeleportEvent entityTeleportEvent = new EntityTeleportEvent( this, this.getLocation(), to, cause );
+        this.world.getServer().getPluginManager().callEvent( entityTeleportEvent );
+        if ( entityTeleportEvent.isCancelled() ) {
+            return;
+        }
 
-    @Override
-    public void teleport( Location to ) {
         Location from = getLocation();
 
-        this.setAndRecalcPosition( to );
+        // Reset chunks
+        this.connection.resetQueuedChunks();
 
         // Check if we need to change worlds
         if ( !to.getWorld().equals( from.getWorld() ) ) {
+            // Despawn entities first
+            this.entityVisibilityManager.clear();
+
             // Change worlds first
             getWorld().removePlayer( this );
             this.world = (WorldAdapter) to.getWorld();
             this.world.spawnEntityAt( this, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch() );
-            this.connection.resetPlayerChunks();
-            this.entityVisibilityManager.clear();
-            this.connection.sendMovePlayer( new Location( to.getWorld(), getPositionX() + 1000000, 4000, getPositionZ() + 1000000 ) );
 
-            int chunkX = CoordinateUtils.fromBlockToChunk( (int) to.getX() );
-            int chunkZ = CoordinateUtils.fromBlockToChunk( (int) to.getZ() );
-            this.world.movePlayerToChunk( chunkX, chunkZ, this );
+            // Be sure to get rid of all loaded chunks
+            this.connection.resetPlayerChunks();
         }
 
+        // Set the new location
+        this.setAndRecalcPosition( to );
+
+        // Force load the new spawn chunk
+        this.getChunk(); // This getChunk uses loadChunk so it will generate or load from disc if needed
+
+        // Move the client
         this.connection.sendMovePlayer( to );
-        this.fallDistance = 0;
+
+        // Send chunks to the client
         this.connection.checkForNewChunks( from );
+        this.fallDistance = 0;
+
+        // Tell the movement handler to force this position to the client
         this.teleportPosition = to;
     }
 
@@ -424,19 +467,16 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         return this.boundingBox;
     }
 
-    /**
-     * Get the players inventory
-     *
-     * @return the players inventory
-     */
-    @Override
-    public PlayerInventory getInventory() {
-        return inventory;
-    }
-
     @Override
     public void openInventory( io.gomint.inventory.Inventory inventory ) {
         if ( inventory instanceof ContainerInventory ) {
+            InventoryOpenEvent event = new InventoryOpenEvent( this, inventory );
+            this.getWorld().getServer().getPluginManager().callEvent( event );
+
+            if ( event.isCancelled() ) {
+                return;
+            }
+
             // We need to generate a window id for the client
             byte foundId = -1;
             for ( byte i = WindowMagicNumbers.FIRST.getId(); i < WindowMagicNumbers.LAST.getId(); i++ ) {
@@ -448,41 +488,30 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
             // No id found?
             if ( foundId == -1 ) {
-                LOGGER.warn( "No free window id: " );
-
-                ByteObjCursor<ContainerInventory> cursor = this.windowIds.cursor();
-                while ( cursor.moveNext() ) {
-                    LOGGER.warn( "ID " + cursor.key() + " -> " + cursor.value().getClass().getName() );
-                }
-
                 return;
             }
 
             // Trigger open
             ContainerInventory containerInventory = (ContainerInventory) inventory;
-            this.windowIds.justPut( foundId, containerInventory );
-            this.containerIds.justPut( containerInventory, foundId );
+            this.windowIds.put( foundId, containerInventory );
+            this.containerIds.put( containerInventory, foundId );
             containerInventory.addViewer( this, foundId );
         }
     }
 
-    /**
-     * Get the players armor
-     *
-     * @return the players armor
-     */
     @Override
-    public ArmorInventory getArmorInventory() {
-        return armorInventory;
-    }
+    public void closeInventory( io.gomint.inventory.Inventory inventory ) {
+        if ( inventory instanceof ContainerInventory ) {
+            byte windowId = this.getWindowId( (ContainerInventory) inventory );
+            if ( windowId != 0 ) {
+                this.closeInventory( windowId );
 
-    /**
-     * Get the virtual inventory for the crafting slots
-     *
-     * @return the players crafting field
-     */
-    public Inventory getCraftingInventory() {
-        return craftingInventory;
+                // Tell the client to close it
+                PacketContainerClose packetContainerClose = new PacketContainerClose();
+                packetContainerClose.setWindowId( windowId );
+                this.connection.send( packetContainerClose );
+            }
+        }
     }
 
     /**
@@ -491,16 +520,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      * @return the players cursor item
      */
     public Inventory getCursorInventory() {
-        return cursorInventory;
-    }
-
-    /**
-     * Get the virtual inventory of the current crafting process
-     *
-     * @return the current crafting input inventory
-     */
-    public Inventory getCraftingInputInventory() {
-        return craftingInputInventory;
+        return this.cursorInventory;
     }
 
     /**
@@ -509,16 +529,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      * @return current offhand inventory
      */
     public Inventory getOffhandInventory() {
-        return offhandInventory;
-    }
-
-    /**
-     * Get the virtual inventory of the current crafting process
-     *
-     * @return the current crafting result inventory
-     */
-    public Inventory getCraftingResultInventory() {
-        return craftingResultInventory;
+        return this.offhandInventory;
     }
 
     /**
@@ -558,82 +569,48 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     }
 
     /**
-     * Fully init inventory and recipes and other stuff which we need to have a full loaded player
+     * Send all data which the client needs before getting chunks
      */
-    public void fullyInit() {
-        this.connection.sendWorldInitialization();
+    public void prepareEntity() {
+        // Send world init data
         this.connection.sendWorldTime( 0 );
-        this.updateAttributes();
+        this.connection.sendWorldInitialization();
+        this.connection.sendSpawnPosition();
+        this.connection.sendWorldTime( 0 );
+        this.connection.sendDifficulty();
+        this.connection.sendCommandsEnabled();
 
+        // Send adventure settings
+        this.sendAdventureSettings();
+
+        // Send commands
         this.sendCommands();
 
-        int gameModeNumber = EnumConnectors.GAMEMODE_CONNECTOR.convert( this.gamemode ).getMagicNumber();
-        this.getAdventureSettings().setWorldImmutable( gameModeNumber == 0x03 );
-        this.getAdventureSettings().setCanFly( ( gameModeNumber & 0x01 ) > 0 );
-        this.getAdventureSettings().setNoClip( gameModeNumber == 0x03 );
-        this.getAdventureSettings().setFlying( gameModeNumber == 0x03 );
-        this.getAdventureSettings().setAttackMobs( gameModeNumber < 0x02 );
-        this.getAdventureSettings().setAttackPlayers( gameModeNumber < 0x02 );
-        this.getAdventureSettings().setNoPvP( gameModeNumber == 0x03 );
-        this.getAdventureSettings().update();
+        // Attributes
+        this.updateAttributes();
 
-        this.sendData( this );
-
+        // Inventories
         this.inventory = new PlayerInventory( this );
         this.armorInventory = new ArmorInventory( this );
-        this.craftingInventory = new CraftingInputInventory( this );
+
         this.cursorInventory = new CursorInventory( this );
         this.offhandInventory = new OffhandInventory( this );
+
+        this.craftingInventory = new CraftingInputInventory( this );
         this.craftingInputInventory = new CraftingInputInventory( this );
         this.craftingResultInventory = new CursorInventory( this );
-        this.windowIds = ContainerObjectMap.withExpectedSize( 2 );
-        this.containerIds = ContainerIDMap.withExpectedSize( 2 );
+
+        this.enchantmentOutputInventory = new CursorInventory( this );
+
+        this.windowIds = new Byte2ObjectOpenHashMap<>();
+        this.containerIds = new Object2ByteOpenHashMap<>();
         this.connection.getServer().getCreativeInventory().addViewer( this );
 
-        // Update player list
-        PacketPlayerlist playerlist = new PacketPlayerlist();
-        playerlist.setMode( (byte) 0 );
-        playerlist.setEntries( new ArrayList<PacketPlayerlist.Entry>() {{
-            add( new PacketPlayerlist.Entry( uuid, getEntityId(), displayName, xboxId, skin ) );
-        }} );
-        this.getConnection().send( playerlist );
-
-        // Spawn for others
-        this.getWorld().spawnEntityAt( this, this.getPositionX(), this.getPositionY(), this.getPositionZ(), this.getYaw(), this.getPitch() );
-
         // Send crafting recipes
-        this.connection.send( this.world.getServer().getRecipeManager().getCraftingRecipesBatch() );
+        this.connection.addToSendQueue( this.world.getServer().getRecipeManager().getCraftingRecipesBatch() );
 
-        // Now its time for the join event since the player is fully loaded
-        PlayerJoinEvent event = this.getConnection().getNetworkManager().getServer().getPluginManager().callEvent( new PlayerJoinEvent( this ) );
-        if ( event.isCancelled() ) {
-            this.connection.disconnect( event.getKickReason() );
-        }
-    }
-
-    @Override
-    public Packet createSpawnPacket() {
-        PacketSpawnPlayer packetSpawnPlayer = new PacketSpawnPlayer();
-        packetSpawnPlayer.setUuid( this.getUUID() );
-        packetSpawnPlayer.setName( this.getName() );
-        packetSpawnPlayer.setEntityId( this.getEntityId() );
-        packetSpawnPlayer.setRuntimeEntityId( this.getEntityId() );
-
-        packetSpawnPlayer.setX( this.getPositionX() );
-        packetSpawnPlayer.setY( this.getPositionY() );
-        packetSpawnPlayer.setZ( this.getPositionZ() );
-
-        packetSpawnPlayer.setVelocityX( this.getMotionX() );
-        packetSpawnPlayer.setVelocityY( this.getMotionY() );
-        packetSpawnPlayer.setVelocityZ( this.getMotionZ() );
-
-        packetSpawnPlayer.setPitch( this.getPitch() );
-        packetSpawnPlayer.setYaw( this.getYaw() );
-        packetSpawnPlayer.setHeadYaw( this.getHeadYaw() );
-
-        packetSpawnPlayer.setItemInHand( this.getInventory().getItemInHand() );
-        packetSpawnPlayer.setMetadataContainer( this.getMetadata() );
-        return packetSpawnPlayer;
+        // Send entity metadata
+        this.sendData( this );
     }
 
     @Override
@@ -657,10 +634,10 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
         // Direction
         Vector playerPosition = this.getPosition();
-        Vector2 directionPlane = this.getDirectionVector();
+        Vector2 directionPlane = this.getDirectionPlane();
         float dot = directionPlane.dot( new Vector2( eyePosition.getX(), eyePosition.getZ() ) );
         float dot1 = directionPlane.dot( new Vector2( playerPosition.getX(), playerPosition.getZ() ) );
-        return ( dot1 - dot ) >= -0.5f;
+        return ( dot1 - dot ) >= -( MathUtils.SQRT_3 / 2 );
     }
 
     /**
@@ -668,7 +645,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      */
     public void cleanup() {
         this.connection.getServer().getCreativeInventory().removeViewer( this );
-        this.connection.getServer().getPlayersByUUID().remove( this.uuid );
+        this.connection.getServer().getPlayersByUUID().remove( this.getUUID() );
 
         Block block = this.world.getBlockAt( this.getPosition().toBlockPosition() );
         block.gotOff( this );
@@ -677,30 +654,36 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         PacketPlayerlist packetPlayerlist = new PacketPlayerlist();
         packetPlayerlist.setMode( (byte) 1 );
         packetPlayerlist.setEntries( new ArrayList<PacketPlayerlist.Entry>() {{
-            add( new PacketPlayerlist.Entry( uuid, getEntityId(), null, null, null ) );
+            add( new PacketPlayerlist.Entry( EntityPlayer.this ) );
         }} );
 
         // Cleanup the visibility manager
         this.entityVisibilityManager.clear();
 
-        // Check all other players
-        for ( io.gomint.entity.EntityPlayer player : this.connection.getServer().getPlayers() ) {
-            EntityPlayer entityPlayer = (EntityPlayer) player;
-            if ( !entityPlayer.equals( this ) ) {
-                entityPlayer.getConnection().addToSendQueue( packetPlayerlist );
-            }
+        // Check all entities
+        for ( WorldAdapter worldAdapter : this.connection.getServer().getWorldManager().getWorlds() ) {
+            worldAdapter.iterateEntities( Entity.class, entity -> {
+                if ( entity instanceof EntityPlayer ) {
+                    EntityPlayer entityPlayer = (EntityPlayer) entity;
+                    if ( !entityPlayer.equals( EntityPlayer.this ) ) {
+                        entityPlayer.getConnection().addToSendQueue( packetPlayerlist );
+                    }
 
-            // Check if player did hide this one
-            if ( entityPlayer.hiddenPlayers != null && entityPlayer.hiddenPlayers.contains( getEntityId() ) ) {
-                entityPlayer.hiddenPlayers.removeLong( getEntityId() );
-            }
+                    // Check if player did hide this one
+                    if ( entityPlayer.hiddenPlayers != null && entityPlayer.hiddenPlayers.contains( getEntityId() ) ) {
+                        entityPlayer.hiddenPlayers.remove( getEntityId() );
+                    }
 
-            // Check if mouseover is the entity
-            if ( entityPlayer.hoverEntity != null && entityPlayer.hoverEntity.equals( this ) ) {
-                entityPlayer.hoverEntity = null;
-            }
+                    // Check if mouseover is the entity
+                    if ( entityPlayer.hoverEntity != null && entityPlayer.hoverEntity.equals( EntityPlayer.this ) ) {
+                        entityPlayer.hoverEntity = null;
+                    }
 
-            entityPlayer.entityVisibilityManager.removeEntity( this );
+                    entityPlayer.entityVisibilityManager.removeEntity( EntityPlayer.this );
+                } else {
+                    entity.hideFor( EntityPlayer.this );
+                }
+            } );
         }
     }
 
@@ -722,9 +705,11 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     public void closeInventory( byte windowId ) {
         ContainerInventory containerInventory = this.windowIds.remove( windowId );
         if ( containerInventory != null ) {
-            LOGGER.info( getName() + " closing inventory " + windowId );
             containerInventory.removeViewer( this );
-            this.containerIds.justRemove( containerInventory );
+            this.containerIds.removeByte( containerInventory );
+
+            InventoryCloseEvent inventoryCloseEvent = new InventoryCloseEvent( this, containerInventory );
+            this.getWorld().getServer().getPluginManager().callEvent( inventoryCloseEvent );
         }
     }
 
@@ -736,16 +721,6 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
      */
     public ContainerInventory getContainerId( byte windowId ) {
         return this.windowIds.get( windowId );
-    }
-
-    /**
-     * Xbox User ID
-     *
-     * @return xbox user id
-     */
-    @Override
-    public String getXboxID() {
-        return this.xboxId;
     }
 
     @Override
@@ -799,7 +774,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         // Send commands
         PacketAvailableCommands packetAvailableCommands = this.connection.getServer().
             getPluginManager().getCommandManager().createPacket( this );
-        this.connection.send( packetAvailableCommands );
+        this.connection.addToSendQueue( packetAvailableCommands );
     }
 
     /**
@@ -815,6 +790,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
             this.world.getServer().getPluginManager().callEvent( exhaustEvent );
 
             if ( exhaustEvent.isCancelled() ) {
+                this.resendAttributes();
                 return;
             }
 
@@ -849,58 +825,62 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
             io.gomint.server.entity.Entity targetEntity = (io.gomint.server.entity.Entity) target;
 
             // Check if the target can be attacked
-            if ( targetEntity.canBeAttackedWithAnItem() ) {
-                if ( !targetEntity.isInvulnerableFrom( this ) ) {
-                    boolean success = false;
+            if ( targetEntity.canBeAttackedWithAnItem() && !targetEntity.isInvulnerableFrom( this ) ) {
+                boolean success = false;
 
-                    // Get this entity attack damage
-                    EntityDamageEvent.DamageSource damageSource = EntityDamageEvent.DamageSource.ENTITY_ATTACK;
-                    float damage = this.getAttribute( Attribute.ATTACK_DAMAGE );
+                // Get this entity attack damage
+                EntityDamageEvent.DamageSource damageSource = EntityDamageEvent.DamageSource.ENTITY_ATTACK;
+                float damage = this.getAttribute( Attribute.ATTACK_DAMAGE );
 
-                    // TODO: Enchantment modifiers
-
-                    // Check for knockback stuff
-                    int knockbackLevel = 0;
-
-                    if ( this.isSprinting() ) {
-                        knockbackLevel++;
-                    }
-
-                    // TODO: Add knockback enchantment
-
-                    if ( damage > 0 ) {
-                        boolean crit = this.fallDistance > 0 && !this.onGround && !this.isOnLadder() && !this.isInsideLiquid();
-                        if ( crit && damage > 0.0f ) {
-                            damage *= 1.5;
-                        }
-
-                        // Check if target can absorb this damage
-                        if ( ( success = targetEntity.damage( new EntityDamageByEntityEvent( targetEntity, this, damageSource, damage ) ) ) ) {
-                            // Apply knockback
-                            if ( knockbackLevel > 0 ) {
-                                // Modify target velocity
-                                Vector targetVelo = targetEntity.getVelocity();
-                                targetVelo.add(
-                                    (float) ( -Math.sin( this.getYaw() * (float) Math.PI / 180.0F ) * (float) knockbackLevel * 0.5F ),
-                                    0.1f,
-                                    (float) ( Math.cos( this.getYaw() * (float) Math.PI / 180.0F ) * (float) knockbackLevel * 0.5F ) );
-                                targetEntity.setVelocity( targetVelo );
-
-                                // Modify our velocity / movement
-                                Vector ownVelo = this.getVelocity();
-                                ownVelo.setX( ownVelo.getX() * 0.6F );
-                                ownVelo.setZ( ownVelo.getZ() * 0.6F );
-                                this.setVelocity( ownVelo );
-                                this.setSprinting( false );
-                            }
-
-                            targetEntity.broadCastMotion();
-                        }
-                    }
-
-                    this.exhaust( 0.3f, PlayerExhaustEvent.Cause.ATTACK );
-                    return success;
+                EnchantmentSharpness sharpness = this.getInventory().getItemInHand().getEnchantment( EnchantmentSharpness.class );
+                if ( sharpness != null ) {
+                    damage += sharpness.getLevel() * 1.25f;
                 }
+
+                // Check for knockback stuff
+                int knockbackLevel = 0;
+
+                if ( this.isSprinting() ) {
+                    knockbackLevel++;
+                }
+
+                EnchantmentKnockback knockback = this.getInventory().getItemInHand().getEnchantment( EnchantmentKnockback.class );
+                if ( knockback != null ) {
+                    knockbackLevel += knockback.getLevel();
+                }
+
+                if ( damage > 0 ) {
+                    boolean crit = this.fallDistance > 0 && !this.onGround && !this.isOnLadder() && !this.isInsideLiquid();
+                    if ( crit && damage > 0.0f ) {
+                        damage *= 1.5;
+                    }
+
+                    // Check if target can absorb this damage
+                    if ( ( success = targetEntity.damage( new EntityDamageByEntityEvent( targetEntity, this, damageSource, damage ) ) ) ) {
+                        // Apply knockback
+                        if ( knockbackLevel > 0 ) {
+                            // Modify target velocity
+                            Vector targetVelo = targetEntity.getVelocity();
+                            targetVelo.add(
+                                (float) ( -Math.sin( this.getYaw() * (float) Math.PI / 180.0F ) * (float) knockbackLevel * 0.5F ),
+                                0.1f,
+                                (float) ( Math.cos( this.getYaw() * (float) Math.PI / 180.0F ) * (float) knockbackLevel * 0.5F ) );
+                            targetEntity.setVelocity( targetVelo );
+
+                            // Modify our velocity / movement
+                            Vector ownVelo = this.getVelocity();
+                            ownVelo.setX( ownVelo.getX() * 0.6F );
+                            ownVelo.setZ( ownVelo.getZ() * 0.6F );
+                            this.setVelocity( ownVelo );
+                            this.setSprinting( false );
+                        }
+
+                        targetEntity.broadCastMotion();
+                    }
+                }
+
+                this.exhaust( 0.3f, PlayerExhaustEvent.Cause.ATTACK );
+                return success;
             }
         }
 
@@ -909,12 +889,17 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
     @Override
     public boolean damage( EntityDamageEvent damageEvent ) {
+        // When allowFlight is on we don't need falling damage
+        if ( this.adventureSettings.isCanFly() && damageEvent.getDamageSource() == EntityDamageEvent.DamageSource.FALL ) {
+            return false;
+        }
+
         // Can't touch this!
         return this.gamemode != Gamemode.CREATIVE && this.gamemode != Gamemode.SPECTATOR && super.damage( damageEvent );
     }
 
     @Override
-    float applyArmorReduction( EntityDamageEvent damageEvent ) {
+    protected float applyArmorReduction( EntityDamageEvent damageEvent, boolean damageArmor ) {
         if ( damageEvent.getDamageSource() == EntityDamageEvent.DamageSource.FALL ||
             damageEvent.getDamageSource() == EntityDamageEvent.DamageSource.VOID ||
             damageEvent.getDamageSource() == EntityDamageEvent.DamageSource.DROWNING ) {
@@ -924,7 +909,10 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         float damage = damageEvent.getDamage();
         float maxReductionDiff = 25 - this.armorInventory.getTotalArmorValue();
         float amplifiedDamage = damage * maxReductionDiff;
-        this.armorInventory.damageEvenly( damage );
+        if ( damageArmor ) {
+            this.armorInventory.damageEvenly( damage );
+        }
+
         return amplifiedDamage / 25.0F;
     }
 
@@ -1078,10 +1066,11 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     }
 
     @Override
-    void checkIfCollided( float movX, float movY, float movZ, float dX, float dY, float dZ ) {
+    protected void checkIfCollided( float movX, float movY, float movZ, float dX, float dY, float dZ ) {
         // Check if we are not on ground or we moved on y axis
         if ( !this.onGround || movY != 0 ) {
-            AxisAlignedBB bb = this.boundingBox.grow( 0, 0.2f, 0 );
+            AxisAlignedBB bb = new AxisAlignedBB( this.boundingBox.getMinX(), this.boundingBox.getMinY() - 0.2f, this.boundingBox.getMinZ(),
+                this.boundingBox.getMaxX(), this.boundingBox.getMaxY(), this.boundingBox.getMaxZ() );
 
             // Check if we collided with a block
             this.onGround = this.world.getCollisionCubes( this, bb, false ) != null;
@@ -1091,29 +1080,8 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     }
 
     @Override
-    public String getDisplayName() {
-        return this.displayName;
-    }
-
-    @Override
-    public void setDisplayName( String displayName ) {
-        this.displayName = displayName;
-        if ( this.connection.getState() == PlayerConnectionState.PLAYING ) {
-            PacketPlayerlist packetPlayerlist = new PacketPlayerlist();
-            packetPlayerlist.setMode( (byte) 0 );
-            packetPlayerlist.setEntries( new ArrayList<PacketPlayerlist.Entry>() {{
-                add( new PacketPlayerlist.Entry( uuid, getEntityId(), displayName, xboxId, skin ) );
-            }} );
-
-            for ( io.gomint.entity.EntityPlayer player : this.connection.getServer().getPlayers() ) {
-                ( (EntityPlayer) player ).connection.addToSendQueue( packetPlayerlist );
-            }
-        }
-    }
-
-    @Override
     public boolean isOnline() {
-        return this.connection.getServer().findPlayerByUUID( this.uuid ).equals( this );
+        return this.equals( this.connection.getServer().findPlayerByUUID( this.getUUID() ) );
     }
 
     @Override
@@ -1127,12 +1095,24 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
     }
 
     // ------- GUI stuff
+    public void sendServerSettings() {
+        if ( this.serverSettingsForm != -1 ) {
+            io.gomint.server.gui.Form form = this.forms.get( this.serverSettingsForm );
+
+            PacketServerSettingsResponse response = new PacketServerSettingsResponse();
+            response.setFormId( this.serverSettingsForm );
+            response.setJson( form.toJSON().toJSONString() );
+            LOGGER.debug( "Sending settings form: {}", response );
+            this.connection.addToSendQueue( response );
+        }
+    }
+
     @Override
     public <T> FormListener<T> showForm( Form form ) {
         int formId = this.formId++;
         io.gomint.server.gui.Form implForm = (io.gomint.server.gui.Form) form;
 
-        this.forms.justPut( formId, implForm );
+        this.forms.put( formId, implForm );
 
         io.gomint.server.gui.FormListener formListener = null;
         if ( form instanceof ButtonList ) {
@@ -1143,7 +1123,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
             formListener = new io.gomint.server.gui.FormListener<FormResponse>();
         }
 
-        this.formListeners.justPut( formId, formListener );
+        this.formListeners.put( formId, formListener );
 
         // Send packet for client
         String json = implForm.toJSON().toJSONString();
@@ -1155,6 +1135,40 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         return formListener;
     }
 
+    @Override
+    public <T> FormListener<T> setSettingsForm( Form form ) {
+        if ( this.serverSettingsForm != -1 ) {
+            this.removeSettingsForm();
+        }
+
+        int formId = this.formId++;
+        io.gomint.server.gui.Form implForm = (io.gomint.server.gui.Form) form;
+
+        this.forms.put( formId, implForm );
+
+        io.gomint.server.gui.FormListener formListener = null;
+        if ( form instanceof ButtonList ) {
+            formListener = new io.gomint.server.gui.FormListener<String>();
+        } else if ( form instanceof Modal ) {
+            formListener = new io.gomint.server.gui.FormListener<Boolean>();
+        } else {
+            formListener = new io.gomint.server.gui.FormListener<FormResponse>();
+        }
+
+        this.formListeners.put( formId, formListener );
+        this.serverSettingsForm = formId;
+        return formListener;
+    }
+
+    @Override
+    public void removeSettingsForm() {
+        if ( this.serverSettingsForm != -1 ) {
+            this.forms.remove( this.serverSettingsForm );
+            this.formListeners.remove( this.serverSettingsForm );
+            this.serverSettingsForm = -1;
+        }
+    }
+
     public void parseGUIResponse( int formId, String json ) {
         // Get the listener and the form
         Form form = this.forms.get( formId );
@@ -1162,8 +1176,10 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
             // Get listener
             io.gomint.server.gui.FormListener formListener = this.formListeners.get( formId );
 
-            this.forms.justRemove( formId );
-            this.formListeners.justRemove( formId );
+            if ( this.serverSettingsForm != formId ) {
+                this.forms.remove( formId );
+                this.formListeners.remove( formId );
+            }
 
             if ( json.equals( "null" ) ) {
                 formListener.getCloseConsumer().accept( null );
@@ -1181,9 +1197,7 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
 
     @Override
     public void despawn() {
-        ObjCursor<Entity> entityObjCursor = getAttachedEntities().cursor();
-        while ( entityObjCursor.moveNext() ) {
-            Entity entity = entityObjCursor.elem();
+        for ( Entity entity : this.getAttachedEntities() ) {
             if ( entity instanceof EntityPlayer ) {
                 ( (EntityPlayer) entity ).getEntityVisibilityManager().removeEntity( this );
             }
@@ -1243,6 +1257,10 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         this.setLevel( level );
     }
 
+    protected boolean shouldTickHunger() {
+        return this.gamemode == Gamemode.SURVIVAL;
+    }
+
     @Override
     public int getLevel() {
         return (int) this.getAttribute( Attribute.EXPERIENCE_LEVEL );
@@ -1263,15 +1281,287 @@ public class EntityPlayer extends EntityHuman implements io.gomint.entity.Entity
         this.world.playSound( this, location, sound, pitch, -1 );
     }
 
-    public void loginInit() {
-        // We attach to the world to get chunks
-        this.neededChunksForSpawn = this.world.addPlayer( this );
-        LOGGER.info( "Player {} needs {} chunks for spawn", this, this.neededChunksForSpawn );
+    @Override
+    public void sendParticle( Vector location, Particle particle ) {
+        this.world.sendParticle( this, location, particle, 0 );
+    }
+
+    @Override
+    public void sendParticle( Vector location, Particle particle, ParticleData data ) {
+        this.world.sendParticle( this, location, particle, data );
+    }
+
+    @Override
+    public void setAllowFlight( boolean value ) {
+        this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.CAN_FLY, value );
+        this.adventureSettings.setCanFly( value );
+        this.adventureSettings.update();
+    }
+
+    @Override
+    public boolean getAllowFlight() {
+        return this.adventureSettings.isCanFly();
+    }
+
+    @Override
+    public void setFlying( boolean value ) {
+        this.adventureSettings.setFlying( value );
+        this.adventureSettings.update();
+    }
+
+    @Override
+    public boolean getFlying() {
+        return this.adventureSettings.isFlying();
+    }
+
+    @Override
+    public void sendTitle( String title, String subtitle, long fadein, long duration, long fadeout, TimeUnit unit ) {
+        if ( !subtitle.equals( "" ) ) {
+            PacketSetTitle subtitlePacket = new PacketSetTitle();
+            subtitlePacket.setType( PacketSetTitle.TitleType.TYPE_SUBTITLE.getId() );
+            subtitlePacket.setText( subtitle );
+            subtitlePacket.setFadeInTime( (int) unit.toMillis( fadein ) / 50 );
+            subtitlePacket.setStayTime( (int) unit.toMillis( duration ) / 50 );
+            subtitlePacket.setFadeOutTime( (int) unit.toMillis( fadeout ) / 50 );
+            this.getConnection().addToSendQueue( subtitlePacket );
+        }
+
+        PacketSetTitle titlePacket = new PacketSetTitle();
+        titlePacket.setType( PacketSetTitle.TitleType.TYPE_TITLE.getId() );
+        titlePacket.setText( title );
+        titlePacket.setFadeInTime( (int) unit.toMillis( fadein ) / 50 );
+        titlePacket.setStayTime( (int) unit.toMillis( duration ) / 50 );
+        titlePacket.setFadeOutTime( (int) unit.toMillis( fadeout ) / 50 );
+        this.getConnection().addToSendQueue( titlePacket );
+    }
+
+    @Override
+    public void sendTitle( String title ) {
+        this.sendTitle( title, "", 1, 1, (long) 0.5, TimeUnit.SECONDS );
+    }
+
+    @Override
+    public void sendTitle( String title, String subtitle ) {
+        this.sendTitle( title, subtitle, 1, 1, (long) 0.5, TimeUnit.SECONDS );
     }
 
     public void firstSpawn() {
         this.connection.sendPlayState( PacketPlayState.PlayState.SPAWN );
         this.getConnection().sendMovePlayer( this.getLocation() );
+
+        // Update player list
+        PacketPlayerlist playerlist = new PacketPlayerlist();
+        playerlist.setMode( (byte) 0 );
+        playerlist.setEntries( new ArrayList<PacketPlayerlist.Entry>() {{
+            add( new PacketPlayerlist.Entry( EntityPlayer.this ) );
+        }} );
+        this.getConnection().addToSendQueue( playerlist );
+
+        // Spawn for others
+        this.getWorld().spawnEntityAt( this, this.getPositionX(), this.getPositionY(), this.getPositionZ(), this.getYaw(), this.getPitch() );
+
+        // Now its time for the join event since the player is fully loaded
+        PlayerJoinEvent event = this.getConnection().getNetworkManager().getServer().getPluginManager().callEvent( new PlayerJoinEvent( this ) );
+        if ( event.isCancelled() ) {
+            this.connection.disconnect( event.getKickReason() );
+        }
+    }
+
+    @Override
+    public void preSpawn( PlayerConnection connection ) {
+
+    }
+
+    @Override
+    public void postSpawn( PlayerConnection connection ) {
+        // TODO: Remove this, its a client bug in 1.2.13
+        PacketEntityMetadata metadata = new PacketEntityMetadata();
+        metadata.setEntityId( this.getEntityId() );
+        metadata.setMetadata( this.metadataContainer );
+        connection.addToSendQueue( metadata );
+    }
+
+    @Override
+    public void setGliding( boolean value ) {
+        this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.GLIDING, value );
+    }
+
+    @Override
+    public boolean isGliding() {
+        return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.GLIDING );
+    }
+
+    @Override
+    public DeviceInfo getDeviceInfo() {
+        return this.connection.getDeviceInfo();
+    }
+
+    @Override
+    protected void checkAfterGravity() {
+        float dX = this.getMotionX();
+        float dY = this.getMotionY();
+        float dZ = this.getMotionZ();
+
+        // Check if we collide with some blocks when we would move that fast
+        List<AxisAlignedBB> collisionList = this.world.getCollisionCubes( this, this.boundingBox.getOffsetBoundingBox( dX, dY, dZ ), false );
+        if ( collisionList != null ) {
+            // Check if we would hit a y border block
+            for ( AxisAlignedBB axisAlignedBB : collisionList ) {
+                dY = axisAlignedBB.calculateYOffset( this.boundingBox, dY );
+            }
+
+            if ( Math.abs( dY ) <= 0.001 ) {
+                dY = 0;
+            }
+
+            this.getTransform().setMotion( dX, dY, dZ );
+        }
+    }
+
+    @Override
+    public CommandOutput dispatchCommand( String command ) {
+        // Search for correct command holder
+        String[] commandParts = command.substring( 1 ).split( " " );
+        int consumed = 0;
+
+        StringBuilder commandName = new StringBuilder( commandParts[consumed] );
+
+        CommandHolder selected = null;
+        while ( selected == null ) {
+            for ( CommandHolder commandHolder : this.connection.getServer().getPluginManager().getCommandManager().getCommands() ) {
+                if ( commandName.toString().equalsIgnoreCase( commandHolder.getName() ) ) {
+                    selected = commandHolder;
+                    break;
+                }
+            }
+
+            consumed++;
+            if ( selected == null ) {
+                if ( commandParts.length == consumed ) {
+                    break;
+                }
+
+                commandName.append( " " ).append( commandParts[consumed] );
+            }
+        }
+
+        // Check if we selected a command
+        if ( selected == null ) {
+            // Send CommandOutput with failure
+            return new CommandOutput().fail( "Command for input '%%s' could not be found", command );
+        } else {
+            // Check for permission
+            if ( selected.getPermission() != null && !this.hasPermission( selected.getPermission() ) ) {
+                return new CommandOutput().fail( "No permission for this command" );
+            } else {
+                // Now we need to parse all additional parameters
+                String[] params;
+                if ( commandParts.length > consumed ) {
+                    params = new String[commandParts.length - consumed];
+                    System.arraycopy( commandParts, consumed, params, 0, commandParts.length - consumed );
+                } else {
+                    params = new String[0];
+                }
+
+                if ( selected.getOverload() != null && params.length > 0 ) {
+                    List<CommandCanidate> commandCanidates = new ArrayList<>();
+                    for ( CommandOverload overload : selected.getOverload() ) {
+                        Iterator<String> paramIterator = Arrays.asList( params ).iterator();
+
+                        if ( !paramIterator.hasNext() && overload.getParameters() == null ) {
+                            commandCanidates.add( new CommandCanidate( overload, new HashMap<>(), true, true ) );
+                        } else {
+                            Map<String, Object> commandInput = new HashMap<>();
+
+                            boolean completed = true;
+                            boolean completedOptionals = true;
+
+                            for ( Map.Entry<String, ParamValidator> entry : overload.getParameters().entrySet() ) {
+                                List<String> input = new ArrayList<>();
+                                ParamValidator validator = entry.getValue();
+
+                                if ( validator.consumesParts() > 0 ) {
+                                    for ( int i = 0; i < validator.consumesParts(); i++ ) {
+                                        if ( !paramIterator.hasNext() ) {
+                                            if ( !validator.isOptional() ) {
+                                                completed = false;
+                                                break;
+                                            } else {
+                                                completedOptionals = false;
+                                            }
+                                        } else {
+                                            input.add( paramIterator.next() );
+                                        }
+                                    }
+                                } else {
+                                    // Consume as much as possible for thing like TEXT, RAWTEXT
+                                    while ( paramIterator.hasNext() ) {
+                                        input.add( paramIterator.next() );
+                                    }
+                                }
+
+                                if ( input.size() == validator.consumesParts() || validator.consumesParts() < 0 ) {
+                                    Object result = validator.validate( input, this );
+                                    if ( result == null ) {
+                                        completed = false;
+                                    }
+
+                                    commandInput.put( entry.getKey(), result );
+                                }
+                            }
+
+                            if ( completed ) {
+                                commandCanidates.add( new CommandCanidate( overload, commandInput, completedOptionals, !paramIterator.hasNext() && completedOptionals ) );
+                            }
+                        }
+                    }
+
+                    if ( !commandCanidates.isEmpty() ) {
+                        // Select best canidate
+                        commandCanidates.sort( new Comparator<CommandCanidate>() {
+                            @Override
+                            public int compare( CommandCanidate o1, CommandCanidate o2 ) {
+                                if ( o1.isReadCompleted() && !o2.isReadCompleted() ) {
+                                    return -1;
+                                } else if ( !o1.isReadCompleted() && o2.isReadCompleted() ) {
+                                    return 1;
+                                }
+
+                                return 0;
+                            }
+                        } );
+
+                        CommandCanidate canidate = commandCanidates.get( 0 );
+                        return tryCommandDispatch( selected, canidate.getArguments() );
+                    }
+
+                    return new CommandOutput().fail( "Command for input '%%s' could not be found", command );
+                } else {
+                    return tryCommandDispatch( selected, new HashMap<>() );
+                }
+            }
+        }
+    }
+
+    private CommandOutput tryCommandDispatch( CommandHolder command, Map<String, Object> arguments ) {
+        // CHECKSTYLE:OFF
+        try {
+            return command.getExecutor().execute( this, command.getName(), arguments );
+        } catch ( Exception e ) {
+            LOGGER.warn( "Command '{}' failed", command.getName(), e );
+            return new CommandOutput().fail( "Command has thrown an error. Please check the logs" );
+        }
+        // CHECKSTYLE:ON
+    }
+
+    public void setUsingItem( boolean value ) {
+        if ( value ) {
+            this.actionStart = ((GoMintServer) GoMint.instance()).getCurrentTickTime();
+            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.ACTION, true );
+        } else {
+            this.actionStart = -1;
+            this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.ACTION, false );
+        }
     }
 
 }

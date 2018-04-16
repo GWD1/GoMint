@@ -1,5 +1,6 @@
 package io.gomint.inventory.item;
 
+import io.gomint.enchant.Enchantment;
 import io.gomint.taglib.NBTTagCompound;
 
 /**
@@ -93,5 +94,29 @@ public interface ItemStack {
      * @return cloned item stack
      */
     ItemStack clone();
+
+    /**
+     * Add enchantment based on class and level
+     *
+     * @param clazz of the enchantment
+     * @param level of the enchantment
+     */
+    void addEnchantment( Class<? extends Enchantment> clazz, short level );
+
+    /**
+     * Get the enchantment or null
+     *
+     * @param clazz of the enchantment
+     * @param <T> type of enchantment object
+     * @return enchantment object or null
+     */
+    <T extends Enchantment> T getEnchantment( Class<? extends Enchantment> clazz );
+
+    /**
+     * Remove a enchantment from this item stack
+     *
+     * @param clazz of the enchantment
+     */
+    void removeEnchantment( Class<? extends Enchantment> clazz );
 
 }

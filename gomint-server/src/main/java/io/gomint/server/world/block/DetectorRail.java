@@ -41,4 +41,9 @@ public class DetectorRail extends Block implements io.gomint.world.block.BlockDe
         return BlockType.DETECTOR_RAIL;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

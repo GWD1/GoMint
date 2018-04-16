@@ -43,4 +43,9 @@ public class Dropper extends Block implements io.gomint.world.block.BlockDropper
         return BlockType.DROPPER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

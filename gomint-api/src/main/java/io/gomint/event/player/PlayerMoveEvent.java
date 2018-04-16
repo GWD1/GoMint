@@ -2,11 +2,15 @@ package io.gomint.event.player;
 
 import io.gomint.entity.EntityPlayer;
 import io.gomint.math.Location;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
+@EqualsAndHashCode( callSuper = true )
+@ToString( callSuper = true )
 public class PlayerMoveEvent extends CancellablePlayerEvent {
 
     private final Location from;

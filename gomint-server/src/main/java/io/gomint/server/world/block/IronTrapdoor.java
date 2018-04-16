@@ -36,4 +36,9 @@ public class IronTrapdoor extends Block implements io.gomint.world.block.BlockIr
         return BlockType.IRON_TRAPDOOR;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

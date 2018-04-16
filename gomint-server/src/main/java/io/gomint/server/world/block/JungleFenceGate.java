@@ -31,4 +31,9 @@ public class JungleFenceGate extends Block implements io.gomint.world.block.Bloc
         return BlockType.JUNGLE_FENCE_GATE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

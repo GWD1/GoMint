@@ -7,6 +7,8 @@
 
 package io.gomint.server.entity.projectile;
 
+import io.gomint.event.entity.projectile.ProjectileHitBlocksEvent;
+import io.gomint.event.player.PlayerPickupItemEvent;
 import io.gomint.inventory.item.ItemArrow;
 import io.gomint.math.Location;
 import io.gomint.math.MathUtils;
@@ -16,12 +18,19 @@ import io.gomint.server.entity.EntityType;
 import io.gomint.server.util.Values;
 import io.gomint.server.util.random.FastRandom;
 import io.gomint.server.world.WorldAdapter;
+import io.gomint.world.block.Block;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
 public class EntityArrow extends EntityProjectile implements io.gomint.entity.projectile.EntityArrow {
+
+    private boolean firedHitEvent = false;
+    private boolean isReset = false;
 
     private boolean canBePickedup;
     private boolean critical;
@@ -92,16 +101,19 @@ public class EntityArrow extends EntityProjectile implements io.gomint.entity.pr
 
         this.lastUpdatedT += dT;
         if ( this.lastUpdatedT >= Values.CLIENT_TICK_RATE ) {
-            if ( this.isCollided ) {
-                // You may pick this up now
-                this.canBePickedup = true;
+            if ( this.isCollided && !this.canBePickedup && !this.firedHitEvent ) { // this.canBePickedup indicates if a event got cancelled
+                // Remap
+                Set<Block> blocks = new HashSet<>( this.collidedWith );
+                ProjectileHitBlocksEvent hitBlockEvent = new ProjectileHitBlocksEvent( blocks, this );
+                this.world.getServer().getPluginManager().callEvent( hitBlockEvent );
+                if ( !hitBlockEvent.isCancelled() ) {
+                    this.canBePickedup = true;
+                }
             }
 
-            if ( this.canBePickedup ) {
-                if ( !this.getVelocity().equals( Vector.ZERO ) ) {
-                    this.setVelocity( Vector.ZERO );
-                    this.setAffectedByGravity( false );
-                }
+            if ( this.canBePickedup && !this.isReset && this.getVelocity().length() < 0.0025 ) {
+                this.setVelocity( Vector.ZERO );
+                this.isReset = true;
             }
 
             // Despawn after 1200 ticks ( 1 minute )
@@ -118,6 +130,12 @@ public class EntityArrow extends EntityProjectile implements io.gomint.entity.pr
 
             // Check if we have place in out inventory to store this item
             if ( !player.getInventory().hasPlaceFor( arrow ) ) {
+                return;
+            }
+
+            PlayerPickupItemEvent pickupItemEvent = new PlayerPickupItemEvent( player, this, arrow );
+            player.getWorld().getServer().getPluginManager().callEvent( pickupItemEvent );
+            if ( pickupItemEvent.isCancelled() ) {
                 return;
             }
 

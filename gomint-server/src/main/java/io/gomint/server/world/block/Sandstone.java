@@ -43,4 +43,9 @@ public class Sandstone extends Block implements io.gomint.world.block.BlockSands
         return BlockType.SANDSTONE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

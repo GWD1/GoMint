@@ -1,7 +1,6 @@
 package io.gomint.server.inventory.item;
 
 import io.gomint.inventory.item.ItemType;
-
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.taglib.NBTTagCompound;
 
@@ -10,7 +9,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 94 )
- public class ItemRedstoneRepeaterActive extends ItemStack implements io.gomint.inventory.item.ItemRedstoneRepeaterActive {
+public class ItemRedstoneRepeaterActive extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemRedstoneRepeaterActive( short data, int amount ) {

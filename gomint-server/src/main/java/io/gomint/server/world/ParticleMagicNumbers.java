@@ -55,9 +55,13 @@ public enum ParticleMagicNumbers {
     CARROT( 38 ),
     //39 unknown
     END_ROD( 40 ),
-    DRAGONS_BREATH( 41 );
+    DRAGONS_BREATH( 41 ),
+    BREAK_BLOCK( -1 ),
+    PUNCH_BLOCK( -2 );
 
-    @Getter private final int id;
+    @Getter
+    private final int id;
+
     ParticleMagicNumbers( int id ) {
         this.id = id;
     }

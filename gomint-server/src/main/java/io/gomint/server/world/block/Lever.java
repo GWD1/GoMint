@@ -41,4 +41,9 @@ public class Lever extends Block implements io.gomint.world.block.BlockLever {
         return BlockType.LEVER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

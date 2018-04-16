@@ -12,11 +12,18 @@ import java.util.List;
  */
 public class BooleanValidator extends EnumValidator {
 
+    private static final List<String> ENUM_VALUES =  new ArrayList<>();
+
+    static {
+        ENUM_VALUES.add( "true" );
+        ENUM_VALUES.add( "false" );
+    }
+
+    /**
+     * Construct a new boolean validator which inserts "true" and "false" into an {@link EnumValidator}
+     */
     public BooleanValidator() {
-        super( new ArrayList<String>(){{
-            add( "true" );
-            add( "false" );
-        }} );
+        super( ENUM_VALUES );
     }
 
     @Override

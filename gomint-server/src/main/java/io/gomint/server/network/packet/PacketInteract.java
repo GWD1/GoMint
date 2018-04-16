@@ -50,7 +50,7 @@ public class PacketInteract extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         buffer.writeByte( this.action.getId() );
         buffer.writeUnsignedVarLong( this.entityId );
 
@@ -60,7 +60,7 @@ public class PacketInteract extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
         this.action = InteractAction.valueOf( buffer.readByte() );
         this.entityId = buffer.readUnsignedVarLong();
 

@@ -29,12 +29,12 @@ public class PacketLogin extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
 
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
         this.protocol = buffer.readInt();
         this.payload = new byte[buffer.readUnsignedVarInt()];
         buffer.readBytes( this.payload );

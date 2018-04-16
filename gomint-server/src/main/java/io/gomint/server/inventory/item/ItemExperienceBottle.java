@@ -10,6 +10,7 @@ import io.gomint.server.entity.projectile.EntityExpBottle;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.taglib.NBTTagCompound;
 import io.gomint.world.block.Block;
+import io.gomint.world.block.BlockFace;
 
 /**
  * @author geNAZt
@@ -29,7 +30,7 @@ public class ItemExperienceBottle extends ItemStack implements io.gomint.invento
     // CHECKSTYLE:ON
 
     @Override
-    public boolean interact( EntityPlayer entity, int face, Vector clickPosition, Block clickedBlock ) {
+    public boolean interact( EntityPlayer entity, BlockFace face, Vector clickPosition, Block clickedBlock ) {
         if ( clickedBlock == null ) {
             EntityExpBottle expBottle = new EntityExpBottle( entity, entity.getWorld() );
             ProjectileLaunchEvent event = new ProjectileLaunchEvent( expBottle, ProjectileLaunchEvent.Cause.THROWING_EXP_BOTTLE );

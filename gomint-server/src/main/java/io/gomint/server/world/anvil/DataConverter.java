@@ -1,18 +1,14 @@
 package io.gomint.server.world.anvil;
 
 import io.gomint.server.util.Pair;
-import io.gomint.world.block.BlockFace;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
-class DataConverter {
+public class DataConverter {
 
-    private Pair<Integer, Converter>[] converter = new Pair[255];
+    private Pair<Integer, Converter>[] converter = new Pair[256];
     private Pair<Integer, Byte> convertedValue = new Pair<>( 0, (byte) 1 );
 
     public DataConverter() {
@@ -36,20 +32,20 @@ class DataConverter {
 
             switch ( m ) {
                 case 0:
-                    return (byte) ( BlockFace.DOWN.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 0
+                    return (byte) ( ( pressed ) ? 8 : 0 ); // 0
                 case 1:
-                    return (byte) ( BlockFace.SOUTH.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 5
+                    return (byte) ( 5 + ( ( pressed ) ? 8 : 0 ) ); // 5
                 case 2:
-                    return (byte) ( BlockFace.NORTH.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 4
+                    return (byte) ( 4 + ( ( pressed ) ? 8 : 0 ) ); // 4
                 case 3:
-                    return (byte) ( BlockFace.WEST.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 3
+                    return (byte) ( 3 + ( ( pressed ) ? 8 : 0 ) ); // 3
                 case 4:
-                    return (byte) ( BlockFace.EAST.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 2
+                    return (byte) ( 2 + ( ( pressed ) ? 8 : 0 ) ); // 2
                 case 5:
-                    return (byte) ( BlockFace.UP.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 1
+                    return (byte) ( 1 + ( ( pressed ) ? 8 : 0 ) ); // 1
             }
 
-            return (byte) ( BlockFace.DOWN.getValue() + ( ( pressed ) ? 8 : 0 ) );
+            return (byte) ( ( pressed ) ? 8 : 0 );
         } );
 
         addConverter( 77, 77, ( b, m ) -> {                                                                                     // Stone Button
@@ -62,20 +58,20 @@ class DataConverter {
 
             switch ( m ) {
                 case 0:
-                    return (byte) ( BlockFace.DOWN.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 0
+                    return (byte) ( ( pressed ) ? 8 : 0 ); // 0
                 case 1:
-                    return (byte) ( BlockFace.SOUTH.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 5
+                    return (byte) ( 5 + ( ( pressed ) ? 8 : 0 ) ); // 5
                 case 2:
-                    return (byte) ( BlockFace.NORTH.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 4
+                    return (byte) ( 4 + ( ( pressed ) ? 8 : 0 ) ); // 4
                 case 3:
-                    return (byte) ( BlockFace.WEST.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 3
+                    return (byte) ( 3 + ( ( pressed ) ? 8 : 0 ) ); // 3
                 case 4:
-                    return (byte) ( BlockFace.EAST.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 2
+                    return (byte) ( 2 + ( ( pressed ) ? 8 : 0 ) ); // 2
                 case 5:
-                    return (byte) ( BlockFace.UP.getValue() + ( ( pressed ) ? 8 : 0 ) ); // 1
+                    return (byte) ( 1 + ( ( pressed ) ? 8 : 0 ) ); // 1
             }
 
-            return (byte) ( BlockFace.DOWN.getValue() + ( ( pressed ) ? 8 : 0 ) );
+            return (byte) ( ( pressed ) ? 8 : 0 );
         } );
 
         addConverter( 157, 126, ( b, m ) -> m );                                                                                // Activator rail
@@ -97,6 +93,7 @@ class DataConverter {
         addConverter( 209, 209, ( b, m ) -> m );
         addConverter( 212, 174, ( b, m ) -> m );
         addConverter( 218, 251, ( b, m ) -> m );
+        addConverter( 255, 252, ( blockId, metaData ) -> metaData );
     }
 
     private void addConverter( int sourceId, int destId, Converter converter ) {

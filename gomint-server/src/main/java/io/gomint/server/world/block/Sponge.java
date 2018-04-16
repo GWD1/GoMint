@@ -31,4 +31,8 @@ public class Sponge extends Block implements io.gomint.world.block.BlockSponge {
         return BlockType.SPONGE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
 }

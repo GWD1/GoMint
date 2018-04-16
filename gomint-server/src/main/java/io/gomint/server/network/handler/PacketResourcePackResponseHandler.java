@@ -31,17 +31,24 @@ public class PacketResourcePackResponseHandler implements PacketHandler<PacketRe
                 LOGGER.debug( "Login state: COMPLETED reached" );
 
                 // Proceed with login
-                connection.setState( PlayerConnectionState.LOGIN );
-                LOGGER.info( "Logging in as " + connection.getEntity().getName() );
-
-                PlayerPreJoinEvent playerPreJoinEvent = new PlayerPreJoinEvent( connection.getEntity() );
-                connection.getServer().getPluginManager().callEvent( playerPreJoinEvent );
-                if ( !playerPreJoinEvent.isCancelled() ) {
-                    connection.getEntity().fullyInit();
-                }
+                this.switchToLogin( connection, currentTimeMillis );
 
                 break;
         }
     }
-    
+
+    private void switchToLogin( PlayerConnection connection, long currentTimeMillis ) {
+        // Proceed with login
+        connection.setState( PlayerConnectionState.LOGIN );
+        LOGGER.info( "Logging in as " + connection.getEntity().getName() );
+
+        connection.getEntity().getLoginPerformance().setResourceEnd( currentTimeMillis );
+
+        PlayerPreJoinEvent playerPreJoinEvent = new PlayerPreJoinEvent( connection.getEntity() );
+        connection.getServer().getPluginManager().callEvent( playerPreJoinEvent );
+        if ( !playerPreJoinEvent.isCancelled() ) {
+            connection.getEntity().prepareEntity();
+        }
+    }
+
 }

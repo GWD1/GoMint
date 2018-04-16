@@ -31,14 +31,14 @@ public class PacketBlockEvent extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         writeBlockPosition( this.position, buffer );
         buffer.writeSignedVarInt( this.data1 );
         buffer.writeSignedVarInt( this.data2 );
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

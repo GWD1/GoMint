@@ -31,4 +31,9 @@ public class LapisLazuliOre extends Block implements io.gomint.world.block.Block
         return BlockType.LAPIS_LAZULI_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

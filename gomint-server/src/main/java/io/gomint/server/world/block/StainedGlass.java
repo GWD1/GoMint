@@ -94,53 +94,55 @@ public class StainedGlass extends Block implements io.gomint.world.block.BlockSt
         switch ( color ) {
             case WHITE:
                 this.setBlockData( (byte) 0 );
-                return;
+                break;
             case ORANGE:
                 this.setBlockData( (byte) 1 );
-                return;
+                break;
             case MAGENTA:
                 this.setBlockData( (byte) 2 );
-                return;
+                break;
             case LIGHT_BLUE:
                 this.setBlockData( (byte) 3 );
-                return;
+                break;
             case YELLOW:
                 this.setBlockData( (byte) 4 );
-                return;
+                break;
             case LIME:
                 this.setBlockData( (byte) 5 );
-                return;
+                break;
             case PINK:
                 this.setBlockData( (byte) 6 );
-                return;
+                break;
             case GRAY:
                 this.setBlockData( (byte) 7 );
-                return;
+                break;
             case LIGHT_GRAY:
                 this.setBlockData( (byte) 8 );
-                return;
+                break;
             case CYAN:
                 this.setBlockData( (byte) 9 );
-                return;
+                break;
             case PURPLE:
                 this.setBlockData( (byte) 10 );
-                return;
+                break;
             case BLUE:
                 this.setBlockData( (byte) 11 );
-                return;
+                break;
             case BROWN:
                 this.setBlockData( (byte) 12 );
-                return;
+                break;
             case GREEN:
                 this.setBlockData( (byte) 13 );
-                return;
+                break;
             case RED:
                 this.setBlockData( (byte) 14 );
-                return;
+                break;
             default:
             case BLACK:
                 this.setBlockData( (byte) 15 );
         }
+
+        this.updateBlock();
     }
 
 }

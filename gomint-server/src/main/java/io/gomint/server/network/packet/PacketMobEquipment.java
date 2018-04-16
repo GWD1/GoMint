@@ -27,7 +27,7 @@ public class PacketMobEquipment extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         buffer.writeUnsignedVarLong( this.entityId );
         writeItemStack( this.stack, buffer );
         buffer.writeByte( this.slot );
@@ -36,7 +36,7 @@ public class PacketMobEquipment extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
         this.entityId = buffer.readUnsignedVarLong();
         this.stack = readItemStack( buffer );
         this.slot = buffer.readByte();

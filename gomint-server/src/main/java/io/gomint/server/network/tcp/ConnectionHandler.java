@@ -10,6 +10,7 @@ package io.gomint.server.network.tcp;
 import com.google.common.collect.MapMaker;
 import io.gomint.jraknet.PacketBuffer;
 import io.gomint.server.network.tcp.protocol.Packet;
+import io.gomint.server.network.tcp.protocol.UpdatePingPacket;
 import io.gomint.server.network.tcp.protocol.WrappedMCPEPacket;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -36,12 +37,12 @@ public class ConnectionHandler extends SimpleChannelInboundHandler<Packet> {
     private ChannelHandlerContext ctx;
 
     private Consumer<Void> whenConnected;
-    @Getter
-    private LinkedBlockingQueue<PacketBuffer> data = new LinkedBlockingQueue<>();
+    @Getter private LinkedBlockingQueue<PacketBuffer> data = new LinkedBlockingQueue<>();
     private Consumer<Throwable> exceptionCallback;
     private Consumer<Void> disconnectCallback;
+    private Consumer<Integer> pingCallback;
 
-    public ConnectionHandler() {
+    ConnectionHandler() {
         super( true );
     }
 
@@ -87,6 +88,8 @@ public class ConnectionHandler extends SimpleChannelInboundHandler<Packet> {
     protected void channelRead0( ChannelHandlerContext channelHandlerContext, final Packet packet ) throws Exception {
         if ( packet instanceof WrappedMCPEPacket ) {
             this.data.add( ( (WrappedMCPEPacket) packet ).getBuffer() );
+        } else if ( packet instanceof UpdatePingPacket ) {
+            this.pingCallback.accept( ( (UpdatePingPacket) packet ).getPing() );
         }
     }
 
@@ -95,6 +98,10 @@ public class ConnectionHandler extends SimpleChannelInboundHandler<Packet> {
         if ( this.exceptionCallback != null ) {
             this.exceptionCallback.accept( cause );
         }
+    }
+
+    public void onPing( Consumer<Integer> callback ) {
+        this.pingCallback = callback;
     }
 
     public void whenConnected( Consumer<Void> callback ) {

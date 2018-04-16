@@ -31,4 +31,9 @@ public class NetherBrick extends Block implements io.gomint.world.block.BlockNet
         return BlockType.NETHER_BRICK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

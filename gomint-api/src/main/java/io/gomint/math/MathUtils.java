@@ -17,6 +17,8 @@ public final class MathUtils {
     private static final double BIG_ENOUGH_FLOOR = BIG_ENOUGH_INT;
     private static final double BIG_ENOUGH_ROUND = BIG_ENOUGH_INT + 0.5;
 
+    public static final double SQRT_3 = Math.sqrt( 3 );
+
     private MathUtils() {
         throw new AssertionError( "Cannot instantiate MathUtils!" );
     }

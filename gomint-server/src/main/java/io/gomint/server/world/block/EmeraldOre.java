@@ -31,4 +31,9 @@ public class EmeraldOre extends Block implements io.gomint.world.block.BlockEmer
         return BlockType.EMERALD_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

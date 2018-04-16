@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 255 )
- public class ItemReserved6 extends ItemStack implements io.gomint.inventory.item.ItemReserved6 {
+ public class ItemReserved6 extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemReserved6( short data, int amount ) {

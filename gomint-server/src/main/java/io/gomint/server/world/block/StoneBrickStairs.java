@@ -31,4 +31,9 @@ public class StoneBrickStairs extends Stairs {
         return BlockType.STONE_BRICK_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -31,4 +31,9 @@ public class Bookshelf extends Block implements io.gomint.world.block.BlockBooks
         return BlockType.BOOKSHELF;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

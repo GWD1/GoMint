@@ -41,4 +41,9 @@ public class PoweredRail extends Block implements io.gomint.world.block.BlockPow
         return BlockType.POWERED_RAIL;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

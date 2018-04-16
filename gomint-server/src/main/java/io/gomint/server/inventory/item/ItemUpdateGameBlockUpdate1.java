@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 248 )
- public class ItemUpdateGameBlockUpdate1 extends ItemStack implements io.gomint.inventory.item.ItemUpdateGameBlockUpdate1 {
+ public class ItemUpdateGameBlockUpdate1 extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemUpdateGameBlockUpdate1( short data, int amount ) {

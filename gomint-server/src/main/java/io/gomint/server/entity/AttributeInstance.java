@@ -2,8 +2,11 @@ package io.gomint.server.entity;
 
 import lombok.Getter;
 import lombok.ToString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * @author geNAZt
@@ -13,14 +16,17 @@ import java.util.EnumMap;
 @Getter
 public class AttributeInstance {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger( AttributeInstance.class );
+
     private final String key;
     private final float minValue;
-    private final float maxValue;
+    private float maxValue;
     private final float defaultValue;
     private float value;
     private boolean dirty;
 
-    private EnumMap<AttributeModifier, Float> modifiers = new EnumMap<>( AttributeModifier.class );
+    private Map<AttributeModifier, Float> modifiers = new EnumMap<>( AttributeModifier.class );
+    private Map<AttributeModifier, Float> multiplyModifiers = new EnumMap<>( AttributeModifier.class );
 
     AttributeInstance( String key, float minValue, float maxValue, float value ) {
         this.key = key;
@@ -33,15 +39,29 @@ public class AttributeInstance {
 
     public void setModifier( AttributeModifier modifier, float amount ) {
         this.modifiers.put( modifier, amount );
-        this.value += amount;
+        this.recalc();
+    }
+
+    private void recalc() {
+        this.value = this.defaultValue;
+
+        // Add normal modifierts
+        for ( Float aFloat : this.modifiers.values() ) {
+            this.value += aFloat;
+        }
+
+        // Now add multiply modifiers
+        for ( Float aFloat : this.multiplyModifiers.values() ) {
+            this.value *= aFloat;
+        }
+
         this.dirty = true;
     }
 
     public void removeModifier( AttributeModifier modifier ) {
         Float amount = this.modifiers.remove( modifier );
         if ( amount != null ) {
-            this.value -= amount;
-            this.dirty = true;
+            this.recalc();
         }
     }
 
@@ -64,6 +84,22 @@ public class AttributeInstance {
         this.modifiers.clear();
         this.value = this.defaultValue;
         this.dirty = true;
+    }
+
+    public void setMaxValue( float maxValue ) {
+        this.maxValue = maxValue;
+    }
+
+    public void setMultiplyModifier( AttributeModifier modifier, float amount ) {
+        this.multiplyModifiers.put( modifier, amount );
+        this.recalc();
+    }
+
+    public void removeMultiplyModifier( AttributeModifier modifier ) {
+        Float amount = this.multiplyModifiers.remove( modifier );
+        if ( amount != null ) {
+            this.recalc();
+        }
     }
 
 }

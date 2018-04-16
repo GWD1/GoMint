@@ -67,19 +67,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.koloboke</groupId>
-            <artifactId>koloboke-impl-common-jdk8</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.koloboke</groupId>
-            <artifactId>koloboke-compile</artifactId>
-            <version>0.5.1</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
             <groupId>org.javassist</groupId>
             <artifactId>javassist</artifactId>
             <version>3.20.0-GA</version>
@@ -88,13 +75,13 @@
         <dependency>
             <groupId>io.gomint</groupId>
             <artifactId>jraknet</artifactId>
-            <version>4.2.0-SNAPSHOT</version>
+            <version>5.0.8-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15on</artifactId>
-            <version>1.54</version>
+            <version>1.59</version>
         </dependency>
 
         <dependency>
@@ -129,7 +116,6 @@
             <artifactId>jna-platform</artifactId>
             <version>4.5.0</version>
         </dependency>
-
     </dependencies>
 
     <build>
@@ -143,8 +129,34 @@
                     <archive>
                         <manifest>
                             <mainClass>io.gomint.server.Bootstrap</mainClass>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
+                        <manifestEntries>
+                            <Premain-Class>io.gomint.server.SelfInstrumentation</Premain-Class>
+                            <Implementation-Build>s:${buildNumber}-b:${buildScmBranch}</Implementation-Build>
+                        </manifestEntries>
                     </archive>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>buildnumber-maven-plugin</artifactId>
+                <version>1.4</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>create</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <scmBranchPropertyName>buildScmBranch</scmBranchPropertyName>
+                    <getRevisionOnlyOnce>true</getRevisionOnlyOnce>
+                    <doCheck>false</doCheck>
+                    <doUpdate>false</doUpdate>
+                    <shortRevisionLength>7</shortRevisionLength>
                 </configuration>
             </plugin>
 

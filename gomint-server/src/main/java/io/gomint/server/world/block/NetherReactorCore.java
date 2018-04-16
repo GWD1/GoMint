@@ -26,4 +26,9 @@ public class NetherReactorCore extends Block implements io.gomint.world.block.Bl
         return BlockType.NETHER_REACTOR_CORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

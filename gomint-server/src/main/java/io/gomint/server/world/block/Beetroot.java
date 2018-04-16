@@ -1,11 +1,9 @@
 package io.gomint.server.world.block;
 
-import io.gomint.world.block.BlockType;
-
 import io.gomint.inventory.item.ItemStack;
-import io.gomint.server.inventory.item.Items;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.world.block.BlockBeetroot;
+import io.gomint.world.block.BlockType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,19 +44,19 @@ public class Beetroot extends Growable implements BlockBeetroot {
     public List<ItemStack> getDrops( ItemStack itemInHand ) {
         if ( getBlockData() >= 0x07 ) {
             List<ItemStack> drops = new ArrayList<ItemStack>() {{
-                add( Items.create( 457, (short) 0, (byte) 1, null ) ); // Beetroot
+                add( world.getServer().getItems().create( 457, (short) 0, (byte) 1, null ) ); // Beetroot
             }};
 
             // Randomize seeds
             int amountOfSeeds = SEED_RANDOMIZER.next();
             if ( amountOfSeeds > 0 ) {
-                drops.add( Items.create( 458, (short) 0, (byte) amountOfSeeds, null ) ); // Seeds
+                drops.add( world.getServer().getItems().create( 458, (short) 0, (byte) amountOfSeeds, null ) ); // Seeds
             }
 
             return drops;
         } else {
             return new ArrayList<ItemStack>() {{
-                add( Items.create( 458, (short) 0, (byte) 1, null ) ); // Seeds
+                add( world.getServer().getItems().create( 458, (short) 0, (byte) 1, null ) ); // Seeds
             }};
         }
     }
@@ -71,6 +69,11 @@ public class Beetroot extends Growable implements BlockBeetroot {
     @Override
     public BlockType getType() {
         return BlockType.BEETROOT;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

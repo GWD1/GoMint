@@ -20,5 +20,6 @@ public enum AttributeModifier {
     // Movement
     SPEED_EFFECT,
     SLOWNESS_EFFECT,
+    SPRINT_MULTIPLY
 
 }

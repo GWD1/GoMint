@@ -78,7 +78,7 @@ public class EncryptionKeyFactory {
             // Generate the keypair:
             this.keyPair = generator.generateKeyPair();
 
-            LOGGER.info( "Server key: " + Base64.getEncoder().encodeToString( this.keyPair.getPublic().getEncoded() ) );
+            LOGGER.info( "Server key: {}", Base64.getEncoder().encodeToString( this.keyPair.getPublic().getEncoded() ) );
         }
     }
 

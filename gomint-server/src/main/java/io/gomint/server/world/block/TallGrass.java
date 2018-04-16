@@ -46,4 +46,9 @@ public class TallGrass extends Block implements io.gomint.world.block.BlockTallG
         return BlockType.TALL_GRASS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

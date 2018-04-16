@@ -9,6 +9,7 @@ import io.gomint.server.registry.RegisterInfo;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author geNAZt
@@ -44,9 +45,8 @@ public class Fire extends Block implements io.gomint.world.block.BlockFire {
 
     @Override
     public void onEntityStanding( EntityLiving entityLiving ) {
-        EntityDamageEvent damageEvent = new EntityDamageEvent( entityLiving, EntityDamageEvent.DamageSource.FIRE, 1.0f );
-        entityLiving.damage( damageEvent );
-        entityLiving.setFire( 8 );
+        entityLiving.attack( 1.0f, EntityDamageEvent.DamageSource.FIRE );
+        entityLiving.setBurning( 8, TimeUnit.SECONDS );
     }
 
     @Override

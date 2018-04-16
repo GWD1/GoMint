@@ -31,4 +31,9 @@ public class EndStone extends Block implements io.gomint.world.block.BlockEndSto
         return BlockType.END_STONE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

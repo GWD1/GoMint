@@ -31,4 +31,9 @@ public class PurpurStairs extends Stairs {
         return BlockType.PURPUR_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

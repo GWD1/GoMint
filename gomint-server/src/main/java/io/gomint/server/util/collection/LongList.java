@@ -99,4 +99,14 @@ public class LongList {
         return this.elementData[--size];
     }
 
+    public boolean contains( long value ) {
+        for ( int i = 0; i < this.size; i++ ) {
+            if ( this.elementData[i] == value ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 }

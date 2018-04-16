@@ -31,4 +31,9 @@ public class RedstoneComparatorUnpowered extends Block implements io.gomint.worl
         return BlockType.REDSTONE_COMPARATOR_UNPOWERED;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

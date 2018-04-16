@@ -36,4 +36,9 @@ public class LilyPad extends Block implements io.gomint.world.block.BlockLilyPad
         return BlockType.LILY_PAD;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

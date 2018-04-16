@@ -29,7 +29,7 @@ public class PacketTileEntityData extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         // Block position
         writeBlockPosition( this.position, buffer );
 
@@ -50,7 +50,7 @@ public class PacketTileEntityData extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

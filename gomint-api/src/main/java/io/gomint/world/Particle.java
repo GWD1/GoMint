@@ -52,6 +52,8 @@ public enum Particle {
     WITCH_SPELL,
     CARROT,
     END_ROD,
-    DRAGONS_BREATH
+    DRAGONS_BREATH,
+    BREAK_BLOCK,
+    PUNCH_BLOCK
 
 }

@@ -31,4 +31,9 @@ public class DoubleStoneSlab extends Block implements io.gomint.world.block.Bloc
         return BlockType.DOUBLE_STONE_SLAB;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

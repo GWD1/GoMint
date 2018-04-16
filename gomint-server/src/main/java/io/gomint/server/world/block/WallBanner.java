@@ -21,4 +21,9 @@ public class WallBanner extends Banner {
         return BlockType.WALL_BANNER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

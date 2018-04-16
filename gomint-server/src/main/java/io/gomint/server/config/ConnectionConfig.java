@@ -1,7 +1,7 @@
 package io.gomint.server.config;
 
-import com.blackypaw.simpleconfig.SimpleConfig;
-import com.blackypaw.simpleconfig.annotation.Comment;
+import io.gomint.config.Comment;
+import io.gomint.config.YamlConfig;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-public class ConnectionConfig extends SimpleConfig {
+public class ConnectionConfig extends YamlConfig {
 
     @Comment("Enable connection encryption. It uses AES-128 so it costs a bit of CPU power")
     private boolean enableEncryption = true;

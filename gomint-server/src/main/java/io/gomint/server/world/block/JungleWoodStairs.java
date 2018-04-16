@@ -31,4 +31,9 @@ public class JungleWoodStairs extends Stairs {
         return BlockType.JUNGLE_WOOD_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

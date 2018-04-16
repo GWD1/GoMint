@@ -23,7 +23,7 @@ public class Invisibility extends Effect {
 
     @Override
     public void apply( EntityLiving entity ) {
-
+        entity.setInvisible( true );
     }
 
     @Override
@@ -33,7 +33,7 @@ public class Invisibility extends Effect {
 
     @Override
     public void remove( EntityLiving entity ) {
-
+        entity.setInvisible( false );
     }
 
 }

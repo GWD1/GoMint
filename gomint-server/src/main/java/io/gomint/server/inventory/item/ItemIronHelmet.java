@@ -2,12 +2,12 @@ package io.gomint.server.inventory.item;
 
 import io.gomint.inventory.item.ItemType;
 
-import io.gomint.inventory.item.ItemAir;
 import io.gomint.math.Vector;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.taglib.NBTTagCompound;
 import io.gomint.world.block.Block;
+import io.gomint.world.block.BlockFace;
 
 /**
  * @author geNAZt
@@ -32,11 +32,12 @@ public class ItemIronHelmet extends ItemArmor implements io.gomint.inventory.ite
     }
 
     @Override
-    public boolean interact( EntityPlayer entity, int face, Vector clickPosition, Block clickedBlock ) {
+    public boolean interact( EntityPlayer entity, BlockFace face, Vector clickPosition, Block clickedBlock ) {
         if ( clickedBlock == null ) {
             if ( isBetter( (ItemStack) entity.getArmorInventory().getHelmet() ) ) {
+                ItemStack old = (ItemStack) entity.getArmorInventory().getHelmet();
                 entity.getArmorInventory().setHelmet( this );
-                entity.getInventory().setItem( entity.getInventory().getItemInHandSlot(), ItemAir.create( 0 ) );
+                entity.getInventory().setItem( entity.getInventory().getItemInHandSlot(), old );
             }
         }
 

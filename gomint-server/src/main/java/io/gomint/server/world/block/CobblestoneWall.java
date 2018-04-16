@@ -36,4 +36,9 @@ public class CobblestoneWall extends Block implements io.gomint.world.block.Bloc
         return BlockType.COBBLESTONE_WALL;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

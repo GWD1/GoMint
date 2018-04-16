@@ -35,7 +35,7 @@ public class PistonPostProcessor extends PostProcessor {
         Block block = getBlock();
         if ( block.getTileEntity() == null ) {
             BlockPosition position = block.getLocation().toBlockPosition();
-            LOGGER.warn( "We need to fix piston head @ " + position );
+            LOGGER.warn( "We need to fix piston head @ {}", position );
 
             NBTTagCompound compound = new NBTTagCompound( "" );
 

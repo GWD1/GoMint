@@ -31,4 +31,9 @@ public class HardenedClay extends Block implements io.gomint.world.block.BlockHa
         return BlockType.HARDENED_CLAY;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

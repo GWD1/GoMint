@@ -1,5 +1,8 @@
 package io.gomint.server.world.block;
 
+import io.gomint.server.entity.tileentity.DaylightDetectorTileEntity;
+import io.gomint.server.entity.tileentity.TileEntity;
+import io.gomint.taglib.NBTTagCompound;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.server.registry.RegisterInfo;
@@ -34,6 +37,21 @@ public class DaylightDetector extends Block implements io.gomint.world.block.Blo
     @Override
     public BlockType getType() {
         return BlockType.DAYLIGHT_DETECTOR;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
+    @Override
+    public boolean needsTileEntity() {
+        return true;
+    }
+
+    @Override
+    TileEntity createTileEntity( NBTTagCompound compound ) {
+        return new DaylightDetectorTileEntity( this.location );
     }
 
 }

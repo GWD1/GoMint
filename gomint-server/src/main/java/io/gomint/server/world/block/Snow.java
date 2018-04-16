@@ -31,4 +31,9 @@ public class Snow extends Block implements io.gomint.world.block.BlockSnow {
         return BlockType.SNOW;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

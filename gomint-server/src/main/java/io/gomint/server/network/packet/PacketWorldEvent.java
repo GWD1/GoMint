@@ -24,14 +24,14 @@ public class PacketWorldEvent extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         buffer.writeSignedVarInt( this.eventId );
         writeVector( this.position, buffer );
         buffer.writeSignedVarInt( this.data );
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

@@ -1,11 +1,9 @@
 package io.gomint.server.world.block;
 
-import io.gomint.world.block.BlockType;
-
 import io.gomint.inventory.item.ItemStack;
-import io.gomint.server.inventory.item.Items;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.world.block.BlockCarrots;
+import io.gomint.world.block.BlockType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,11 +45,11 @@ public class Carrots extends Growable implements BlockCarrots {
         if ( getBlockData() >= 0x07 ) {
 
             return new ArrayList<ItemStack>() {{
-                add( Items.create( 391, (short) 0, (byte) ( 1 + SEED_RANDOMIZER.next().byteValue() ), null ) ); // Carrot
+                add( world.getServer().getItems().create( 391, (short) 0, (byte) ( 1 + SEED_RANDOMIZER.next().byteValue() ), null ) ); // Carrot
             }};
         } else {
             return new ArrayList<ItemStack>() {{
-                add( Items.create( 391, (short) 0, (byte) 1, null ) ); // Carrot
+                add( world.getServer().getItems().create( 391, (short) 0, (byte) 1, null ) ); // Carrot
             }};
         }
     }
@@ -64,6 +62,11 @@ public class Carrots extends Growable implements BlockCarrots {
     @Override
     public BlockType getType() {
         return BlockType.CARROTS;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

@@ -31,4 +31,9 @@ public class SlimeBlock extends Block implements io.gomint.world.block.BlockSlim
         return BlockType.SLIME_BLOCK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

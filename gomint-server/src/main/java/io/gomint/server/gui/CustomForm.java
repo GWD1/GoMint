@@ -94,7 +94,7 @@ public class CustomForm extends Form implements io.gomint.gui.CustomForm {
             JSONArray answers = (JSONArray) new JSONParser().parse( json.trim() );
             for ( int i = 0; i < answers.size(); i++ ) {
                 Element element = this.elements.get( i );
-                response.addAnswer( element.getId(), answers.get( i ) );
+                response.addAnswer( element.getId(), element.getAnswer( answers.get( i ) ) );
             }
 
             return response;

@@ -1,8 +1,13 @@
 package io.gomint.server.world.block;
 
+import io.gomint.inventory.item.ItemCobblestone;
+import io.gomint.inventory.item.ItemStack;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.server.registry.RegisterInfo;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author geNAZt
@@ -29,6 +34,13 @@ public class Stone extends Block implements io.gomint.world.block.BlockStone {
     @Override
     public BlockType getType() {
         return BlockType.STONE;
+    }
+
+    @Override
+    public List<ItemStack> getDrops( ItemStack itemInHand ) {
+        return new ArrayList<ItemStack>(){{
+            add( ItemCobblestone.create( 1 ) );
+        }};
     }
 
 }

@@ -17,6 +17,7 @@ public class EntityDamageEvent extends CancellableEntityEvent {
 
     private final DamageSource damageSource;
     private float damage;
+    private float finalDamage;
 
     /**
      * Create a new entity based cancellable event
@@ -32,18 +33,39 @@ public class EntityDamageEvent extends CancellableEntityEvent {
     }
 
     /**
-     * Set the damage which should be dealt to the entity
+     * Set the final damage which should be applied to the entity.
      *
      * @param damage which should be dealt
+     */
+    public void setFinalDamage( float damage ) {
+        this.finalDamage = damage;
+    }
+
+    /**
+     * Get the amount of damage which should be applied to the entity
+     *
+     * @return damage which should be dealt
+     */
+    public float getFinalDamage() {
+        return this.finalDamage;
+    }
+
+    /**
+     * Set the input damage to this event. When the final damage has not been modified this value will be used to
+     * calculate the final damage being dealt. There is no way to get the new final damage before it is applied to the
+     * entity.
+     *
+     * @param damage which should be used to calculate the final damage
      */
     public void setDamage( float damage ) {
         this.damage = damage;
     }
 
     /**
-     * Get the damage which should be dealt to the entity
+     * Get the damage which has been input into the calculation. This value represents the damage before any
+     * reduction.
      *
-     * @return damage being dealt
+     * @return damage which is used in the final calculation
      */
     public float getDamage() {
         return this.damage;

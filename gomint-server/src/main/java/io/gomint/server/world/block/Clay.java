@@ -31,4 +31,8 @@ public class Clay extends Block implements io.gomint.world.block.BlockClay {
         return BlockType.CLAY;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
 }

@@ -7,6 +7,7 @@
 
 package io.gomint.server.world;
 
+import io.gomint.GoMint;
 import io.gomint.entity.Entity;
 import io.gomint.entity.EntityPlayer;
 import io.gomint.event.player.PlayerInteractEvent;
@@ -25,16 +26,19 @@ import io.gomint.server.entity.tileentity.TileEntity;
 import io.gomint.server.network.PlayerConnection;
 import io.gomint.server.network.packet.*;
 import io.gomint.server.util.EnumConnectors;
-import io.gomint.server.util.collection.PlayerMap;
 import io.gomint.server.util.random.FastRandom;
 import io.gomint.server.world.block.Air;
-import io.gomint.server.world.block.Blocks;
-import io.gomint.server.world.generator.ChunkGenerator;
-import io.gomint.server.world.generator.VoidGenerator;
 import io.gomint.server.world.storage.TemporaryStorage;
 import io.gomint.world.*;
 import io.gomint.world.block.Block;
 import io.gomint.world.block.BlockAir;
+import io.gomint.world.block.BlockFace;
+import io.gomint.world.generator.ChunkGenerator;
+import io.gomint.world.generator.GeneratorContext;
+import io.gomint.world.generator.integrated.VoidGenerator;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -42,9 +46,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -59,6 +64,7 @@ public abstract class WorldAdapter implements World {
     // Shared objects
     @Getter
     protected final GoMintServer server;
+    @Getter
     protected final Logger logger;
 
     // World properties
@@ -86,25 +92,24 @@ public abstract class WorldAdapter implements World {
     // Block ticking
     int randomUpdateNumber = FastRandom.current().nextInt();
     TickList tickQueue = new TickList();
-    private final Set<Long> neighbourUpdates = new HashSet<>();
 
     // I/O
-    private boolean asyncWorkerRunning;
+    private AtomicBoolean asyncWorkerRunning;
     private BlockingQueue<AsyncChunkTask> asyncChunkTasks;
     private Queue<AsyncChunkPackageTask> chunkPackageTasks;
     private Thread asyncWorkerThread;
 
     // EntityPlayer handling
-    private PlayerMap players;
+    private Object2ObjectMap<io.gomint.server.entity.EntityPlayer, ChunkAdapter> players;
 
     protected WorldAdapter( GoMintServer server, File worldDir ) {
-        this.chunkGenerator = new VoidGenerator( this );
+        this.chunkGenerator = new VoidGenerator( this, new GeneratorContext() );
         this.server = server;
         this.logger = LoggerFactory.getLogger( "io.gomint.World-" + worldDir.getName() );
         this.worldDir = worldDir;
         this.entityManager = new EntityManager( this );
         this.config = this.server.getWorldConfig( worldDir.getName() );
-        this.players = PlayerMap.withExpectedSize( this.server.getServerConfig().getMaxPlayers() );
+        this.players = new Object2ObjectOpenHashMap<>();
         this.asyncChunkTasks = new LinkedBlockingQueue<>();
         this.chunkPackageTasks = new ConcurrentLinkedQueue<>();
         this.startAsyncWorker( server.getExecutorService() );
@@ -118,7 +123,7 @@ public abstract class WorldAdapter implements World {
      *
      * @return The Collection View of the Players currently on this world
      */
-    public PlayerMap getPlayers0() {
+    public Object2ObjectMap<io.gomint.server.entity.EntityPlayer, ChunkAdapter> getPlayers0() {
         return this.players;
     }
 
@@ -128,9 +133,7 @@ public abstract class WorldAdapter implements World {
      * @return collection of all players online on this world
      */
     public Collection<EntityPlayer> getPlayers() {
-        Collection<EntityPlayer> playerReturn = new HashSet<>();
-        playerReturn.addAll( this.players.keySet() );
-        return playerReturn;
+        return new HashSet<>( this.players.keySet() );
     }
 
     @Override
@@ -146,27 +149,29 @@ public abstract class WorldAdapter implements World {
      * @param sound  The sound which should be played
      * @param pitch  The pitch at which the sound should be played
      * @param data   additional data for the sound
+     * @throws IllegalArgumentException when the sound data given is incorrect for the sound wanted to play
      */
     public void playSound( EntityPlayer player, Vector vector, Sound sound, byte pitch, SoundData data ) {
         int soundData = -1;
 
         switch ( sound ) {
+            case LAND:
             case BREAK_BLOCK:
             case PLACE:
             case HIT:
                 // Need a block
                 if ( data.getBlock() == null ) {
-                    throw new IllegalStateException( "Sound " + sound + " needs block sound data" );
+                    throw new IllegalArgumentException( "Sound " + sound + " needs block sound data" );
                 }
 
-                soundData = Blocks.getID( data.getBlock() );
+                soundData = BlockRuntimeIDs.fromLegacy( this.server.getBlocks().getID( data.getBlock() ), (byte) 0 );
 
                 break;
 
             case NOTE:
                 // Check if needed data is there
                 if ( data.getInstrument() == null ) {
-                    throw new IllegalStateException( "Sound NOTE needs instrument sound data" );
+                    throw new IllegalArgumentException( "Sound NOTE needs instrument sound data" );
                 }
 
                 switch ( data.getInstrument() ) {
@@ -248,17 +253,27 @@ public abstract class WorldAdapter implements World {
         return this.getBlockAt( pos.getX(), pos.getY(), pos.getZ() );
     }
 
+    private Block getOptionalBlockAt( BlockPosition position ) {
+        if ( position.getY() < 0 || position.getY() > 255 ) {
+            return null;
+        }
+
+        ChunkAdapter chunkAdapter = this.getChunk( position.getX() >> 4, position.getZ() >> 4 );
+        if ( chunkAdapter != null ) {
+            return chunkAdapter.getBlockAt( position.getX() & 0xF, position.getY(), position.getZ() & 0xF );
+        }
+
+        return null;
+    }
+
     @Override
     public <T extends Block> T getBlockAt( int x, int y, int z ) {
         // Secure location
         if ( y < 0 || y > 255 ) {
-            return (T) Blocks.get( 0, (byte) 0, (byte) ( y > 255 ? 15 : 0 ), (byte) 0, null, new Location( this, x, y, z ) );
+            return (T) this.server.getBlocks().get( 0, (byte) 0, (byte) ( y > 255 ? 15 : 0 ), (byte) 0, null, new Location( this, x, y, z ) );
         }
 
-        int xChunk = CoordinateUtils.fromBlockToChunk( x );
-        int zChunk = CoordinateUtils.fromBlockToChunk( z );
-
-        ChunkAdapter chunk = this.loadChunk( xChunk, zChunk, true );
+        ChunkAdapter chunk = this.loadChunk( x >> 4, z >> 4, true );
         return chunk.getBlockAt( x & 0xF, y, z & 0xF );
     }
 
@@ -275,6 +290,27 @@ public abstract class WorldAdapter implements World {
             true );
 
         chunk.setBlock( position.getX() & 0xF, position.getY(), position.getZ() & 0xF, blockId );
+    }
+
+    /**
+     * Get the current id at the given location
+     *
+     * @param position where we want to search
+     * @return id of the block
+     */
+    public int getBlockId( BlockPosition position ) {
+        // Sanity check
+        if ( position.getY() < 0 ) {
+            this.logger.warn( "Got request for block under y 0", new Exception() );
+            return 0;
+        }
+
+        final ChunkAdapter chunk = this.loadChunk(
+            CoordinateUtils.fromBlockToChunk( position.getX() ),
+            CoordinateUtils.fromBlockToChunk( position.getZ() ),
+            true );
+
+        return chunk.getBlock( position.getX() & 0xF, position.getY(), position.getZ() & 0xF );
     }
 
     /**
@@ -326,23 +362,18 @@ public abstract class WorldAdapter implements World {
 
         // Random blocks
         if ( !this.config.isDisableRandomTicking() ) {
-            long[] tickingHashes = this.chunkCache.getTickingChunks( dT );
-            for ( long chunkHash : tickingHashes ) {
-                ChunkAdapter chunkAdapter = this.chunkCache.getChunkInternal( chunkHash );
-                chunkAdapter.update( currentTimeMS, dT );
-            }
+            this.tickRandomBlocks( currentTimeMS, dT );
         }
 
         // Scheduled blocks
         while ( this.tickQueue.getNextTaskTime() < currentTimeMS ) {
-            long blockToUpdate = this.tickQueue.getNextElement();
-            if ( blockToUpdate == Long.MIN_VALUE ) {
+            BlockPosition blockToUpdate = this.tickQueue.getNextElement();
+            if ( blockToUpdate == null ) {
                 break;
             }
 
             // Get the block
-            BlockPosition blockPosition = CoordinateUtils.fromLong( blockToUpdate );
-            Block block = getBlockAt( blockPosition );
+            Block block = getOptionalBlockAt( blockToUpdate );
             if ( block != null ) {
                 // CHECKSTYLE:OFF
                 try {
@@ -360,30 +391,6 @@ public abstract class WorldAdapter implements World {
             }
         }
 
-        // Neighbour updates
-        if ( this.neighbourUpdates.size() > 0 ) {
-            for ( Long blockToUpdate : this.neighbourUpdates ) {
-                Block block = getBlockAt( CoordinateUtils.fromLong( blockToUpdate ) );
-                if ( block != null ) {
-                    // CHECKSTYLE:OFF
-                    try {
-                        io.gomint.server.world.block.Block block1 = (io.gomint.server.world.block.Block) block;
-                        long next = block1.update( UpdateReason.NEIGHBOUR_UPDATE, currentTimeMS, dT );
-
-                        // Reschedule if needed
-                        if ( next > currentTimeMS ) {
-                            this.tickQueue.add( next, blockToUpdate );
-                        }
-                    } catch ( Exception e ) {
-                        logger.error( "Error whilst ticking block @ " + blockToUpdate, e );
-                    }
-                    // CHECKSTYLE:ON
-                }
-            }
-
-            this.neighbourUpdates.clear();
-        }
-
         // ---------------------------------------
         // Update all entities
         this.entityManager.update( currentTimeMS, dT );
@@ -396,30 +403,25 @@ public abstract class WorldAdapter implements World {
             AsyncChunkPackageTask task = this.chunkPackageTasks.poll();
             ChunkAdapter chunk = this.getChunk( task.getX(), task.getZ() );
             if ( chunk == null ) {
-                final Object lock = new Object();
+                chunk = this.loadChunk( task.getX(), task.getZ(), false );
+            }
 
-                this.getOrLoadChunk( task.getX(), task.getZ(), false, arg -> {
-                    synchronized ( lock ) {
-                        packageChunk( arg, task.getCallback() );
-                        lock.notifyAll();
-                    }
-                } );
-
-                // Wait until the chunk is loaded
-                synchronized ( lock ) {
-                    try {
-                        lock.wait();
-                    } catch ( InterruptedException e ) {
-                        // Ignored .-.
-                    }
-                }
-            } else {
+            if ( chunk != null ) {
                 packageChunk( chunk, task.getCallback() );
             }
         }
 
         // ---------------------------------------
         // Perform regular updates:
+    }
+
+
+    private void tickRandomBlocks( long currentTimeMS, float dT ) {
+        long[] tickingHashes = this.chunkCache.getTickingChunks( dT );
+        for ( long chunkHash : tickingHashes ) {
+            ChunkAdapter chunkAdapter = this.chunkCache.getChunkInternal( chunkHash );
+            chunkAdapter.update( currentTimeMS, dT );
+        }
     }
 
     // ==================================== ENTITY MANAGEMENT ==================================== //
@@ -433,10 +435,10 @@ public abstract class WorldAdapter implements World {
      */
     public int addPlayer( io.gomint.server.entity.EntityPlayer player ) {
         // Schedule sending spawn region chunks:
-        final int minChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) - 3;
-        final int minChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) - 3;
-        final int maxChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) + 3;
-        final int maxChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) + 3;
+        final int minChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) - player.getViewDistance();
+        final int minChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) - player.getViewDistance();
+        final int maxChunkX = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getX() ) + player.getViewDistance();
+        final int maxChunkZ = CoordinateUtils.fromBlockToChunk( (int) this.spawn.getZ() ) + player.getViewDistance();
 
         int amountOfChunks = 0;
         for ( int i = minChunkZ; i <= maxChunkZ; ++i ) {
@@ -542,35 +544,47 @@ public abstract class WorldAdapter implements World {
         }
 
         // Check if we already have a task
-        for ( AsyncChunkTask task : this.asyncChunkTasks ) {
-            if ( task instanceof AsyncChunkLoadTask ) {
-                AsyncChunkLoadTask loadTask = (AsyncChunkLoadTask) task;
-                if ( loadTask.getX() == x && loadTask.getZ() == z ) {
-                    // Set generating if needed
-                    if ( !loadTask.isGenerate() && generate ) {
-                        loadTask.setGenerate( true );
-                    }
+        AsyncChunkLoadTask oldTask = this.findAsyncChunkLoadTask( x, z );
+        if ( oldTask != null ) {
+            this.logger.debug( "Found loader for chunk {} {}", x, z );
 
-                    // Check for multi callback
-                    MultiOutputDelegate multiOutputDelegate;
-                    if ( loadTask.getCallback() instanceof MultiOutputDelegate ) {
-                        multiOutputDelegate = (MultiOutputDelegate) loadTask.getCallback();
-                        multiOutputDelegate.getOutputs().offer( callback );
-                    } else {
-                        Delegate delegate = loadTask.getCallback();
-                        multiOutputDelegate = new MultiOutputDelegate();
-                        multiOutputDelegate.getOutputs().offer( delegate );
-                        loadTask.setCallback( delegate );
-                    }
-
-                    return;
-                }
+            // Set generating if needed
+            if ( !oldTask.isGenerate() && generate ) {
+                oldTask.setGenerate( true );
             }
+
+            // Check for multi callback
+            MultiOutputDelegate<ChunkAdapter> multiOutputDelegate;
+            if ( oldTask.getCallback() instanceof MultiOutputDelegate ) {
+                multiOutputDelegate = (MultiOutputDelegate<ChunkAdapter>) oldTask.getCallback();
+                multiOutputDelegate.getOutputs().offer( callback );
+            } else {
+                Delegate<ChunkAdapter> delegate = oldTask.getCallback();
+                multiOutputDelegate = new MultiOutputDelegate<>();
+                multiOutputDelegate.getOutputs().offer( delegate );
+                multiOutputDelegate.getOutputs().offer( callback );
+                oldTask.setCallback( multiOutputDelegate );
+            }
+
+            return;
         }
 
         // Schedule this chunk for asynchronous loading:
         AsyncChunkLoadTask task = new AsyncChunkLoadTask( x, z, generate, callback );
         this.asyncChunkTasks.offer( task );
+    }
+
+    private AsyncChunkLoadTask findAsyncChunkLoadTask( int x, int z ) {
+        for ( AsyncChunkTask task : this.asyncChunkTasks ) {
+            if ( task instanceof AsyncChunkLoadTask ) {
+                AsyncChunkLoadTask loadTask = (AsyncChunkLoadTask) task;
+                if ( loadTask.getX() == x && loadTask.getZ() == z ) {
+                    return loadTask;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -583,9 +597,7 @@ public abstract class WorldAdapter implements World {
      */
     public void sendChunk( int x, int z, io.gomint.server.entity.EntityPlayer player, boolean sync ) {
         Delegate2<Long, ChunkAdapter> sendDelegate = ( chunkHash, chunk ) -> {
-            if ( !player.getChunkSendQueue().contains( chunk ) ) {
-                player.getChunkSendQueue().offer( chunk );
-            }
+            player.getChunkSendQueue().offer( chunk );
         };
 
         if ( !sync ) {
@@ -614,22 +626,20 @@ public abstract class WorldAdapter implements World {
 
         if ( oldChunk == null ) {
             newChunk.addPlayer( player );
-            this.players.justPut( player, newChunk );
+            this.players.put( player, newChunk );
         }
 
         if ( oldChunk != null && !oldChunk.equals( newChunk ) ) {
             oldChunk.removePlayer( player );
             newChunk.addPlayer( player );
-            this.players.justPut( player, newChunk );
+            this.players.put( player, newChunk );
         }
     }
 
     /**
      * Prepares the region surrounding the world's spawn point.
-     *
-     * @throws IOException Throws in case the spawn region could not be loaded nor generated
      */
-    protected void prepareSpawnRegion() throws IOException {
+    protected void prepareSpawnRegion() {
         final int spawnRadius = this.config.getAmountOfChunksForSpawnArea();
         if ( spawnRadius == 0 ) {
             return;
@@ -653,7 +663,7 @@ public abstract class WorldAdapter implements World {
      * @param generate A boolean which decides whether or not the chunk should be generated when not found
      * @return The loaded or generated Chunk
      */
-    protected abstract ChunkAdapter loadChunk( int x, int z, boolean generate );
+    public abstract ChunkAdapter loadChunk( int x, int z, boolean generate );
 
     /**
      * Saves the given chunk to its respective region file. The respective region file
@@ -670,7 +680,7 @@ public abstract class WorldAdapter implements World {
      */
     void saveChunkAsynchronously( ChunkAdapter chunk ) {
         AsyncChunkSaveTask task = new AsyncChunkSaveTask( chunk );
-        this.asyncChunkTasks.add( task );
+        this.asyncChunkTasks.offer( task );
     }
 
     /**
@@ -730,7 +740,7 @@ public abstract class WorldAdapter implements World {
      * Starts the asynchronous worker thread used by the world to perform I/O operations for chunks.
      */
     private void startAsyncWorker( ExecutorService executorService ) {
-        this.asyncWorkerRunning = true;
+        this.asyncWorkerRunning = new AtomicBoolean( true );
 
         executorService.execute( () -> {
             Thread.currentThread().setName( Thread.currentThread().getName() + " [Async World I/O: " + WorldAdapter.this.getWorldName() + "]" );
@@ -743,9 +753,9 @@ public abstract class WorldAdapter implements World {
      * Main loop of the world's asynchronous worker thread.
      */
     private void asyncWorkerLoop() {
-        while ( this.asyncWorkerRunning ) {
+        while ( this.asyncWorkerRunning.get() ) {
             try {
-                AsyncChunkTask task = this.asyncChunkTasks.poll( 500, TimeUnit.MILLISECONDS );
+                AsyncChunkTask task = this.asyncChunkTasks.take();
                 if ( task == null ) {
                     continue;
                 }
@@ -755,6 +765,7 @@ public abstract class WorldAdapter implements World {
                     case LOAD:
                         AsyncChunkLoadTask load = (AsyncChunkLoadTask) task;
                         chunk = this.loadChunk( load.getX(), load.getZ(), load.isGenerate() );
+
                         load.getCallback().invoke( chunk );
                         break;
 
@@ -769,6 +780,8 @@ public abstract class WorldAdapter implements World {
 
                         break;
                 }
+            } catch ( InterruptedException interrupted ) {
+                return;
             } catch ( Throwable cause ) {
                 // Catching throwable in order to make sure no uncaught exceptions puts
                 // the asynchronous worker into nirvana:
@@ -785,15 +798,12 @@ public abstract class WorldAdapter implements World {
     public void updateBlock( BlockPosition pos ) {
         flagChunkDirty( pos );
 
-        sendToVisible( pos, null, new Predicate<Entity>() {
-            @Override
-            public boolean test( Entity entity ) {
-                if ( entity instanceof io.gomint.server.entity.EntityPlayer ) {
-                    ( (io.gomint.server.entity.EntityPlayer) entity ).getBlockUpdates().add( pos );
-                }
-
-                return false;
+        sendToVisible( pos, null, entity -> {
+            if ( entity instanceof io.gomint.server.entity.EntityPlayer ) {
+                ( (io.gomint.server.entity.EntityPlayer) entity ).getBlockUpdates().add( pos );
             }
+
+            return false;
         } );
     }
 
@@ -813,8 +823,10 @@ public abstract class WorldAdapter implements World {
         // Update the block
         PacketUpdateBlock updateBlock = new PacketUpdateBlock();
         updateBlock.setPosition( pos );
-        updateBlock.setBlockId( block.getBlockId() );
-        updateBlock.setPrioAndMetadata( (byte) ( ( PacketUpdateBlock.FLAG_ALL_PRIORITY << 4 ) | ( block.getBlockData() ) ) );
+
+        updateBlock.setBlockId( BlockRuntimeIDs.fromLegacy( block.getBlockId(), block.getBlockData() ) );
+        updateBlock.setPrioAndMetadata( (byte) PacketUpdateBlock.FLAG_ALL_PRIORITY << 4 );
+
         connection.addToSendQueue( updateBlock );
 
         // Check for tile entity
@@ -843,7 +855,20 @@ public abstract class WorldAdapter implements World {
      * @return either null if there are no entities or a collection of entities
      */
     public Collection<Entity> getNearbyEntities( AxisAlignedBB bb, Entity exception ) {
-        Set<Entity> nearby = null;
+        final Set[] nearby = new HashSet[1];
+        final Consumer<Entity> consumer = new Consumer<Entity>() {
+            @Override
+            public void accept( Entity entity ) {
+                if ( !entity.equals( exception ) && entity.getBoundingBox().intersectsWith( bb ) ) {
+                    if ( nearby[0] == null ) {
+                        nearby[0] = new HashSet<>();
+                    }
+
+                    nearby[0].add( entity );
+                }
+            }
+        };
+
         int lastChunkX = Integer.MAX_VALUE;
         int lastChunkZ = Integer.MIN_VALUE;
 
@@ -860,16 +885,34 @@ public abstract class WorldAdapter implements World {
                 if ( chunkX != lastChunkX || chunkZ != lastChunkZ ) {
                     Chunk chunk = this.getChunk( chunkX, chunkZ );
                     if ( chunk != null ) {
-                        Collection<io.gomint.entity.Entity> entities = chunk.getEntities();
-                        if ( entities != null ) {
-                            for ( io.gomint.entity.Entity entity : entities ) {
-                                if ( !entity.equals( exception ) && entity.getBoundingBox().intersectsWith( bb ) ) {
-                                    if ( nearby == null ) {
-                                        nearby = new HashSet<>();
-                                    }
+                        chunk.iterateEntities( Entity.class, consumer );
+                    }
+                }
+            }
+        }
 
-                                    nearby.add( entity );
-                                }
+        return nearby[0];
+    }
+
+    private <T> List<T> iterateBlocks( int minX, int maxX, int minY, int maxY, int minZ, int maxZ, AxisAlignedBB bb, boolean returnBoundingBoxes, boolean includePassThrough ) {
+        List values = null;
+
+        for ( int z = minZ; z < maxZ; ++z ) {
+            for ( int x = minX; x < maxX; ++x ) {
+                for ( int y = minY; y < maxY; ++y ) {
+                    Block block = this.getBlockAt( x, y, z );
+
+                    if ( !block.canPassThrough() || includePassThrough ) {
+                        AxisAlignedBB blockBox = block.getBoundingBox();
+                        if ( blockBox.intersectsWith( bb ) ) {
+                            if ( values == null ) {
+                                values = new ArrayList<>();
+                            }
+
+                            if ( returnBoundingBoxes ) {
+                                values.add( blockBox );
+                            } else {
+                                values.add( block );
                             }
                         }
                     }
@@ -877,10 +920,17 @@ public abstract class WorldAdapter implements World {
             }
         }
 
-        return nearby;
+        return values;
     }
 
-    public List<Block> getCollisionBlocks( io.gomint.entity.Entity entity ) {
+    /**
+     * Get blocks which collide with the given entity.
+     *
+     * @param entity             which is used to check for block collisions
+     * @param includePassThrough if the result should also include blocks which can normally be passed through
+     * @return list of blocks with which the entity collides, or null when no block has been found
+     */
+    public List<Block> getCollisionBlocks( io.gomint.entity.Entity entity, boolean includePassThrough ) {
         AxisAlignedBB bb = entity.getBoundingBox().grow( 0.1f, 0.01f, 0.1f );
 
         int minX = MathUtils.fastFloor( bb.getMinX() );
@@ -890,27 +940,7 @@ public abstract class WorldAdapter implements World {
         int maxY = MathUtils.fastCeil( bb.getMaxY() );
         int maxZ = MathUtils.fastCeil( bb.getMaxZ() );
 
-        List<Block> blocks = null;
-        for ( int z = minZ; z < maxZ; ++z ) {
-            for ( int x = minX; x < maxX; ++x ) {
-                for ( int y = minY; y < maxY; ++y ) {
-                    Block block = this.getBlockAt( x, y, z );
-
-                    if ( !block.canPassThrough() ) {
-                        AxisAlignedBB blockBox = block.getBoundingBox();
-                        if ( blockBox.intersectsWith( bb ) ) {
-                            if ( blocks == null ) {
-                                blocks = new ArrayList<>();
-                            }
-
-                            blocks.add( block );
-                        }
-                    }
-                }
-            }
-        }
-
-        return blocks;
+        return iterateBlocks( minX, maxX, minY, maxY, minZ, maxZ, bb, false, includePassThrough );
     }
 
     @Override
@@ -922,26 +952,7 @@ public abstract class WorldAdapter implements World {
         int maxY = MathUtils.fastCeil( bb.getMaxY() );
         int maxZ = MathUtils.fastCeil( bb.getMaxZ() );
 
-        List<AxisAlignedBB> collisions = null;
-
-        for ( int z = minZ; z < maxZ; ++z ) {
-            for ( int x = minX; x < maxX; ++x ) {
-                for ( int y = minY; y < maxY; ++y ) {
-                    Block block = this.getBlockAt( x, y, z );
-
-                    if ( !block.canPassThrough() ) {
-                        AxisAlignedBB blockBox = block.getBoundingBox();
-                        if ( blockBox.intersectsWith( bb ) ) {
-                            if ( collisions == null ) {
-                                collisions = new ArrayList<>();
-                            }
-
-                            collisions.add( blockBox );
-                        }
-                    }
-                }
-            }
-        }
+        List<AxisAlignedBB> collisions = iterateBlocks( minX, maxX, minY, maxY, minZ, maxZ, bb, true, false );
 
         if ( includeEntities ) {
             Collection<io.gomint.entity.Entity> entities = getNearbyEntities( bb.grow( 0.25f, 0.25f, 0.25f ), entity );
@@ -969,7 +980,7 @@ public abstract class WorldAdapter implements World {
      * @param entity        which interacts with the block
      * @return true when interaction was successful, false when not
      */
-    public boolean useItemOn( ItemStack itemInHand, BlockPosition blockPosition, int face, Vector clickPosition, io.gomint.server.entity.EntityPlayer entity ) {
+    public boolean useItemOn( ItemStack itemInHand, BlockPosition blockPosition, BlockFace face, Vector clickPosition, io.gomint.server.entity.EntityPlayer entity ) {
         Block blockClicked = this.getBlockAt( blockPosition );
         if ( blockClicked instanceof Air ) {
             return false;
@@ -1006,17 +1017,16 @@ public abstract class WorldAdapter implements World {
                     return false;
                 }
 
-                // Check if we want to replace the block we are in
-                if ( entity.getLocation().toBlockPosition().equals( replaceBlock.getLocation().toBlockPosition() ) ) {
-                    return false;
-                }
-
                 // We got the block we want to replace
                 // Let the item build up the block
-                boolean success = Blocks.replaceWithItem( entity, clickedBlock, replaceBlock, itemInHand, clickPosition );
+                boolean success = this.server.getBlocks().replaceWithItem( entity, clickedBlock, replaceBlock, itemInHand, clickPosition );
                 if ( success ) {
-                    // Schedule neighbour updates
+                    // Play sound
+                    io.gomint.server.world.block.Block newBlock = replaceBlock.getLocation().getWorld().getBlockAt( replaceBlock.getLocation().toBlockPosition() );
+                    playSound( null, newBlock.getLocation(), Sound.PLACE, (byte) 1, BlockRuntimeIDs.fromLegacy( newBlock.getBlockId(), (byte) 0 ) );
 
+                    // Schedule neighbour updates
+                    scheduleNeighbourUpdates( newBlock );
                 }
 
                 return success;
@@ -1024,6 +1034,25 @@ public abstract class WorldAdapter implements World {
         }
 
         return false;
+    }
+
+    private void scheduleNeighbourUpdates( Block block ) {
+        io.gomint.server.world.block.Block implBlock = (io.gomint.server.world.block.Block) block;
+        for ( BlockFace face : BlockFace.values() ) {
+            io.gomint.server.world.block.Block neighbourBlock = implBlock.getSide( face );
+
+            // CHECKSTYLE:OFF
+            try {
+                long next = neighbourBlock.update( UpdateReason.NEIGHBOUR_UPDATE, this.server.getCurrentTickTime(), 0f );
+                if ( next > this.server.getCurrentTickTime() ) {
+                    BlockPosition position = neighbourBlock.getLocation().toBlockPosition();
+                    this.tickQueue.add( next, position );
+                }
+            } catch ( Exception e ) {
+                this.logger.error( "Exception while updating block @ {}", neighbourBlock.getLocation(), e );
+            }
+            // CHECKSTYLE:ON
+        }
     }
 
     public EntityItem createItemDrop( Location location, ItemStack item ) {
@@ -1034,14 +1063,10 @@ public abstract class WorldAdapter implements World {
 
     public void close() {
         // Stop async worker
-        this.asyncWorkerRunning = false;
+        this.asyncWorkerRunning.set( false );
 
         // Wait until the thread is done
-        try {
-            this.asyncWorkerThread.join();
-        } catch ( InterruptedException e ) {
-            this.logger.warn( "Async thread did not end correctly: ", e );
-        }
+        this.asyncWorkerThread.interrupt();
     }
 
     public TemporaryStorage getTemporaryBlockStorage( BlockPosition position ) {
@@ -1056,23 +1081,31 @@ public abstract class WorldAdapter implements World {
 
     public ChunkAdapter generate( int x, int z ) {
         if ( this.chunkGenerator != null ) {
-            ChunkAdapter chunkAdapter = this.chunkGenerator.generate( x, z );
-            if ( chunkAdapter != null ) {
-                this.chunkCache.putChunk( chunkAdapter );
-                return chunkAdapter;
+            ChunkAdapter chunk = (ChunkAdapter) this.chunkGenerator.generate( x, z );
+            if ( chunk != null ) {
+                this.chunkCache.putChunk( chunk );
+                return chunk;
             }
         }
 
         return null;
     }
 
-    public void playLevelEvent( Vector position, int levelEvent, int data ) {
+    public void sendLevelEvent( Vector position, int levelEvent, int data ) {
+        this.sendLevelEvent( null, position, levelEvent, data );
+    }
+
+    public void sendLevelEvent( EntityPlayer player, Vector position, int levelEvent, int data ) {
         PacketWorldEvent worldEvent = new PacketWorldEvent();
         worldEvent.setData( data );
         worldEvent.setEventId( levelEvent );
         worldEvent.setPosition( position );
 
-        sendToVisible( position.toBlockPosition(), worldEvent, entity -> true );
+        if ( player != null ) {
+            ( (io.gomint.server.entity.EntityPlayer) player ).getConnection().addToSendQueue( worldEvent );
+        } else {
+            sendToVisible( position.toBlockPosition(), worldEvent, entity -> true );
+        }
     }
 
     public void storeTileEntity( BlockPosition position, TileEntity tileEntity ) {
@@ -1085,18 +1118,18 @@ public abstract class WorldAdapter implements World {
         chunk.setTileEntity( x & 0xF, y, z & 0xF, tileEntity );
     }
 
-    public boolean breakBlock( BlockPosition position, boolean drops, ItemStack itemInHand ) {
+    public boolean breakBlock( BlockPosition position, List<ItemStack> drops ) {
         io.gomint.server.world.block.Block block = getBlockAt( position );
         if ( block.onBreak() ) {
-            if ( drops ) {
-                for ( ItemStack itemStack : block.getDrops( itemInHand ) ) {
+            if ( !drops.isEmpty() ) {
+                for ( ItemStack itemStack : drops ) {
                     EntityItem item = this.createItemDrop( block.getLocation(), itemStack );
                     item.setVelocity( new Vector( 0.1f, 0.3f, 0.1f ) );
                 }
             }
 
             // Break animation (this also plays the break sound in the client)
-            playLevelEvent( position.toVector().add( .5f, .5f, .5f ), LevelEvent.PARTICLE_DESTROY, block.getBlockId() | ( block.getBlockData() << 8 ) );
+            sendLevelEvent( position.toVector().add( .5f, .5f, .5f ), LevelEvent.PARTICLE_DESTROY, block.getBlockId() & 0xFF | ( block.getBlockData() << 8 ) );
 
             block.setType( BlockAir.class );
 
@@ -1119,8 +1152,7 @@ public abstract class WorldAdapter implements World {
     public void scheduleBlockUpdate( Location location, long delay, TimeUnit unit ) {
         BlockPosition position = location.toBlockPosition();
         long key = this.server.getCurrentTickTime() + unit.toMillis( delay );
-
-        this.tickQueue.add( key, CoordinateUtils.toLong( position.getX(), position.getY(), position.getZ() ) );
+        this.tickQueue.add( key, position );
     }
 
     public void dropItem( Location location, ItemStack drop ) {
@@ -1131,9 +1163,70 @@ public abstract class WorldAdapter implements World {
         item.setVelocity( motion );
     }
 
-    public void playParticle( Location location, Particle particle, int data ) {
-        int eventId = LevelEvent.ADD_PARTICLE_MASK | EnumConnectors.PARTICLE_CONNECTOR.convert( particle ).getId();
-        playLevelEvent( location, eventId, data );
+    @Override
+    public void sendParticle( Vector location, Particle particle ) {
+        this.sendParticle( null, location, particle, 0 );
+    }
+
+    public void sendParticle( EntityPlayer player, Vector location, Particle particle, int data ) {
+        int eventId;
+        switch ( particle ) {
+            case PUNCH_BLOCK:
+                eventId = LevelEvent.PARTICLE_PUNCH_BLOCK;
+                break;
+            case BREAK_BLOCK:
+                eventId = LevelEvent.PARTICLE_DESTROY;
+                break;
+            default:
+                eventId = LevelEvent.ADD_PARTICLE_MASK | EnumConnectors.PARTICLE_CONNECTOR.convert( particle ).getId();
+        }
+
+        sendLevelEvent( player, location, eventId, data );
+    }
+
+    @Override
+    public void sendParticle( Vector location, Particle particle, ParticleData data ) {
+        this.sendParticle( null, location, particle, data );
+    }
+
+    public void sendParticle( EntityPlayer player, Vector location, Particle particle, ParticleData data ) {
+        int dataNumber = 0;
+
+        switch ( particle ) {
+            case FALLING_DUST:
+                if ( data.getRed() == -1 || data.getBlue() == -1 || data.getGreen() == -1 || data.getAlpha() == -1 ) {
+                    throw new IllegalArgumentException( "Particle data does not reflect color for particle " + particle );
+                }
+
+                dataNumber = ( ( data.getAlpha() & 0xff ) << 24 ) |
+                    ( ( data.getRed() & 0xff ) << 16 ) |
+                    ( ( data.getGreen() & 0xff ) << 8 ) |
+                    ( data.getBlue() & 0xff );
+
+                break;
+
+            case PUNCH_BLOCK:
+                if ( data.getBlock() == null || data.getFace() == -1 ) {
+                    throw new IllegalArgumentException( "Particle data does not reflect block and face data for particle " + particle );
+                }
+
+                io.gomint.server.world.block.Block block = (io.gomint.server.world.block.Block) data.getBlock();
+                dataNumber = BlockRuntimeIDs.fromLegacy( block.getBlockId(), block.getBlockData() ) | ( data.getFace() << 24 );
+
+                break;
+
+            case BREAK_BLOCK:
+                if ( data.getBlock() == null ) {
+                    throw new IllegalArgumentException( "Particle data does not reflect block data for particle " + particle );
+                }
+
+                block = (io.gomint.server.world.block.Block) data.getBlock();
+                dataNumber = BlockRuntimeIDs.fromLegacy( block.getBlockId(), block.getBlockData() );
+
+                break;
+        }
+
+        this.sendParticle( player, location, particle, dataNumber );
     }
 
     public void createExpOrb( Location location, int amount ) {
@@ -1148,10 +1241,13 @@ public abstract class WorldAdapter implements World {
 
     @Override
     public void unload( Consumer<EntityPlayer> playerConsumer ) {
+        if ( !GoMint.instance().isMainThread() ) {
+            this.logger.warn( "Unloading worlds from an async thread. This is not safe and can lead to CME" );
+        }
+
         // Unload all players via API
-        Set<EntityPlayer> players = new HashSet<>( this.players.size() );
-        this.players.forEach( ( player, chunkAdapter ) -> players.add( player ) );
-        players.forEach( playerConsumer );
+        Set<EntityPlayer> playerCopy = new HashSet<>( this.players.keySet() );
+        playerCopy.forEach( playerConsumer );
 
         // Stop this world
         this.close();
@@ -1159,8 +1255,91 @@ public abstract class WorldAdapter implements World {
         // Save this world
         this.chunkCache.saveAll();
 
+        // Drop all FDs
+        this.closeFDs();
+
         // Remove world from manager
         this.server.getWorldManager().unloadWorld( this );
+    }
+
+    protected abstract void closeFDs();
+
+    @Override
+    public <T extends Block> void iterateBlocks( Class<T> blockClass, Consumer<T> blockConsumer ) {
+        // Get the id of the block which we search
+        int blockId = this.server.getBlocks().getID( blockClass );
+
+        // Iterate over all chunks
+        this.chunkCache.iterateAll( chunkAdapter -> {
+            int chunkZ = chunkAdapter.getZ();
+            int chunkX = chunkAdapter.getX();
+
+            for ( int x = 0; x < 16; x++ ) {
+                for ( int y = 0; y < 256; y++ ) {
+                    for ( int z = 0; z < 16; z++ ) {
+                        int currentBlockId = chunkAdapter.getBlock( x, y, z ) & 0xFF;
+                        if ( currentBlockId == blockId ) {
+                            T block = getBlockAt( ( chunkX << 4 ) + x, y, ( chunkZ << 4 ) + z );
+                            blockConsumer.accept( block );
+                        }
+                    }
+                }
+            }
+        } );
+    }
+
+    @Override
+    public <T extends Entity> void iterateEntities( Class<T> entityClass, Consumer<T> entityConsumer ) {
+        // Iterate over all chunks
+        this.chunkCache.iterateAll( chunkAdapter -> chunkAdapter.iterateEntities( entityClass, entityConsumer ) );
+    }
+
+    /**
+     * Adjust the spawn level to the first in air block
+     */
+    protected void adjustSpawn() {
+        BlockPosition check = new BlockPosition( (int) this.spawn.getX(), 0, (int) this.spawn.getZ() );
+        for ( int i = 255; i > 0; i-- ) {
+            check.setY( i );
+            if ( this.getBlockId( check ) != 0 ) {
+                this.spawn.setY( i + 1 );
+                break;
+            }
+        }
+    }
+
+    public void constructGenerator( Class<? extends ChunkGenerator> generator, GeneratorContext context ) throws WorldCreateException {
+        try {
+            this.chunkGenerator = generator.getConstructor( World.class, GeneratorContext.class ).newInstance( this, context );
+        } catch ( NoSuchMethodException e ) {
+            throw new WorldCreateException( "The given generator does not provide a (World, GeneratorContext) constructor" );
+        } catch ( IllegalAccessException e ) {
+            throw new WorldCreateException( "The given generator can't be constructed. Be sure the (World, GeneratorContext) constructor is public" );
+        } catch ( InstantiationException e ) {
+            throw new WorldCreateException( "The generator given is either an abstracted class or some kind of interface" );
+        } catch ( InvocationTargetException e ) {
+            throw new WorldCreateException( "The constructor of the generator has thrown this exception", e );
+        }
+    }
+
+    public void addTickingBlock( long time, BlockPosition position ) {
+        this.tickQueue.add( time, position );
+    }
+
+    public boolean isUpdateScheduled( BlockPosition position ) {
+        return this.tickQueue.contains( position );
+    }
+
+    @Override
+    public void save() {
+        this.chunkCache.saveAll();
+    }
+
+    public void registerEntitiesFromChunk( ChunkAdapter chunk ) {
+        Long2ObjectMap<Entity> entities = chunk.getEntities();
+        if ( entities != null && !entities.isEmpty() ) {
+            this.entityManager.addFromChunk( entities );
+        }
     }
 
 }

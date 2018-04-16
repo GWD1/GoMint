@@ -36,4 +36,9 @@ public class Sunflower extends Block implements io.gomint.world.block.BlockSunfl
         return BlockType.SUNFLOWER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

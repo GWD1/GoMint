@@ -33,6 +33,7 @@ public class PacketMovePlayerHandler implements PacketHandler<PacketMovePlayer> 
         // Does the entity have a teleport open?
         if ( connection.getEntity().getTeleportPosition() != null ) {
             if ( connection.getEntity().getTeleportPosition().distanceSquared( to ) > 0.2 ) {
+                LOGGER.warn( "Player {} did not teleport to {}", connection.getEntity().getName(), connection.getEntity().getTeleportPosition() );
                 connection.sendMovePlayer( connection.getEntity().getTeleportPosition() );
                 return;
             } else {

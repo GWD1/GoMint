@@ -1,15 +1,13 @@
 package io.gomint.server.inventory.item;
 
-import io.gomint.inventory.item.ItemType;
-
 import io.gomint.event.entity.projectile.ProjectileLaunchEvent;
 import io.gomint.inventory.item.ItemAir;
-import io.gomint.math.Vector;
+import io.gomint.inventory.item.ItemType;
+import io.gomint.server.enchant.EnchantmentInfinity;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.entity.projectile.EntityArrow;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.taglib.NBTTagCompound;
-import io.gomint.world.block.Block;
 
 /**
  * @author geNAZt
@@ -55,7 +53,7 @@ public class ItemBow extends ItemStack implements io.gomint.inventory.item.ItemB
      */
     public void shoot( EntityPlayer player ) {
         // Check if player did start
-        if ( player.getStartBow() == -1 ) {
+        if ( player.getActionStart() == -1 ) {
             return;
         }
 
@@ -65,7 +63,7 @@ public class ItemBow extends ItemStack implements io.gomint.inventory.item.ItemB
             return;
         }
 
-        player.setStartBow( -1 );
+        player.setUsingItem( false );
 
         // Check for arrows in inventory
         boolean foundArrow = false;
@@ -87,10 +85,13 @@ public class ItemBow extends ItemStack implements io.gomint.inventory.item.ItemB
                 ItemStack itemStack = (ItemStack) player.getInventory().getItem( i );
                 if ( itemStack instanceof ItemArrow ) {
                     foundArrow = true;
-                    if ( itemStack.afterPlacement() ) {
-                        player.getOffhandInventory().setItem( i, ItemAir.create( 0 ) );
-                    } else {
-                        player.getOffhandInventory().setItem( i, itemStack );
+
+                    if ( this.getEnchantment( EnchantmentInfinity.class ) == null ) {
+                        if ( itemStack.afterPlacement() ) {
+                            player.getOffhandInventory().setItem( i, ItemAir.create( 0 ) );
+                        } else {
+                            player.getOffhandInventory().setItem( i, itemStack );
+                        }
                     }
                 }
             }
@@ -118,7 +119,7 @@ public class ItemBow extends ItemStack implements io.gomint.inventory.item.ItemB
     }
 
     private float calculateForce( EntityPlayer player ) {
-        long currentDraw = player.getWorld().getServer().getCurrentTickTime() - player.getStartBow();
+        long currentDraw = player.getWorld().getServer().getCurrentTickTime() - player.getActionStart();
         float force = (float) currentDraw / 1000f;
         if ( force < 0.1f ) {
             return -1f;
@@ -131,14 +132,6 @@ public class ItemBow extends ItemStack implements io.gomint.inventory.item.ItemB
         return force;
     }
 
-    @Override
-    public boolean interact( EntityPlayer entity, int face, Vector clickPosition, Block clickedBlock ) {
-        if ( clickedBlock == null ) {
-            entity.setStartBow( entity.getWorld().getServer().getCurrentTickTime() );
-        }
-
-        return false;
-    }
     @Override
     public ItemType getType() {
         return ItemType.BOW;

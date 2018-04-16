@@ -31,4 +31,9 @@ public class IronOre extends Block implements io.gomint.world.block.BlockIronOre
         return BlockType.IRON_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

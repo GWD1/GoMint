@@ -12,9 +12,9 @@ import io.gomint.inventory.item.ItemStack;
 import io.gomint.math.Location;
 import io.gomint.math.Vector;
 import io.gomint.server.inventory.MaterialMagicNumbers;
-import io.gomint.server.inventory.item.Items;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.taglib.NBTTagCompound;
+import io.gomint.world.block.BlockFace;
 import lombok.Getter;
 
 /**
@@ -24,9 +24,20 @@ import lombok.Getter;
 public abstract class TileEntity {
 
     // CHECKSTYLE:OFF
-    @Getter protected Location location;
+    @Getter
+    protected Location location;
     private byte moveable;
     // CHECKSTYLE:ON
+
+    /**
+     * Construct new tile entity from position and world data
+     *
+     * @param location where the new tile should be located
+     */
+    TileEntity( Location location ) {
+        this.location = location;
+        this.moveable = 1;
+    }
 
     /**
      * Construct new TileEntity from TagCompound
@@ -42,11 +53,12 @@ public abstract class TileEntity {
             tagCompound.getInteger( "z", 0 )
         );
 
-        this.moveable = tagCompound.getByte( "isMoveable", (byte) 1 );
+        this.moveable = tagCompound.getByte( "isMovable", (byte) 1 );
     }
 
     io.gomint.server.inventory.item.ItemStack getItemStack( NBTTagCompound compound ) {
         // Check for correct ids
+        WorldAdapter worldAdapter = (WorldAdapter) this.location.getWorld();
 
         // This is needed since minecraft changed from storing raw ids to string keys somewhere in 1.7 / 1.8
         int material;
@@ -58,13 +70,13 @@ public abstract class TileEntity {
 
         // Skip non existent items for PE
         if ( material == 0 ) {
-            return Items.create( 0, (short) 0, (byte) 0, null );
+            return worldAdapter.getServer().getItems().create( 0, (short) 0, (byte) 0, null );
         }
 
         short data = compound.getShort( "Damage", (short) 0 );
         byte amount = compound.getByte( "Count", (byte) 1 );
 
-        return Items.create( material, data, amount, compound.getCompound( "tag", false ) );
+        return worldAdapter.getServer().getItems().create( material, data, amount, compound.getCompound( "tag", false ) );
     }
 
 
@@ -87,7 +99,7 @@ public abstract class TileEntity {
      */
     public abstract void update( long currentMillis, float dF );
 
-    public void interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public void interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
 
     }
 
@@ -100,7 +112,7 @@ public abstract class TileEntity {
         compound.addValue( "x", (int) this.location.getX() );
         compound.addValue( "y", (int) this.location.getY() );
         compound.addValue( "z", (int) this.location.getZ() );
-        compound.addValue( "isMoveable", this.moveable );
+        compound.addValue( "isMovable", this.moveable );
     }
 
 }

@@ -1,5 +1,6 @@
 package io.gomint.server.world.block;
 
+import io.gomint.world.block.BlockFace;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.inventory.item.ItemStack;
@@ -36,7 +37,7 @@ public class Cake extends Block implements io.gomint.world.block.BlockCake {
     }
 
     @Override
-    public boolean interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public boolean interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         if ( entity instanceof EntityPlayer ) {
             EntityPlayer player = (EntityPlayer) entity;
             if ( player.getHunger() < 20 ) {
@@ -65,6 +66,11 @@ public class Cake extends Block implements io.gomint.world.block.BlockCake {
     @Override
     public BlockType getType() {
         return BlockType.CAKE;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

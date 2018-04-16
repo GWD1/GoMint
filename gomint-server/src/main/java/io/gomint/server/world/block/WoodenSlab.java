@@ -4,13 +4,14 @@ import io.gomint.world.block.BlockType;
 
 import io.gomint.math.AxisAlignedBB;
 import io.gomint.server.registry.RegisterInfo;
+import io.gomint.world.block.BlockWoodenSlab;
 
 /**
  * @author geNAZt
  * @version 1.0
  */
 @RegisterInfo( id = 158 )
-public class WoodenSlab extends Slab {
+public class WoodenSlab extends Slab implements BlockWoodenSlab {
 
     @Override
     public int getBlockId() {
@@ -35,6 +36,11 @@ public class WoodenSlab extends Slab {
     @Override
     public BlockType getType() {
         return BlockType.WOODEN_SLAB;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

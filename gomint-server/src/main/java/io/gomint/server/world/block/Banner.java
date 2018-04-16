@@ -16,4 +16,9 @@ public abstract class Banner extends Block {
         return 1500;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

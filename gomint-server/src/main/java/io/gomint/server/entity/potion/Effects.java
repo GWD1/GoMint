@@ -7,11 +7,11 @@
 
 package io.gomint.server.entity.potion;
 
+import io.gomint.server.GoMintServer;
 import io.gomint.server.entity.potion.effect.Effect;
 import io.gomint.server.entity.potion.generator.EffectGenerator;
 import io.gomint.server.registry.GeneratorCallback;
 import io.gomint.server.registry.Registry;
-import javassist.*;
 
 /**
  * @author geNAZt
@@ -19,44 +19,28 @@ import javassist.*;
  */
 public class Effects {
 
-    private static final Registry<EffectGenerator> GENERATORS = new Registry<>( new GeneratorCallback<EffectGenerator>() {
-        @Override
-        public EffectGenerator generate( int id, Class<?> clazz ) {
-            // Create generated Generator for this block
-            ClassPool pool = ClassPool.getDefault();
-            CtClass generatorCT = pool.makeClass( "io.gomint.server.entity.potion.generator." + clazz.getSimpleName() );
+    private final Registry<EffectGenerator> generators;
 
-            try {
-                generatorCT.setInterfaces( new CtClass[]{ pool.get( "io.gomint.server.entity.potion.generator.EffectGenerator" ) } );
-            } catch ( NotFoundException e ) {
-                e.printStackTrace();
+    public Effects( GoMintServer server ) {
+        this.generators = new Registry<>( server, new GeneratorCallback<EffectGenerator>() {
+            @Override
+            public EffectGenerator generate( Class<?> clazz ) {
+                try {
+                    // Use the same code source as the Gomint JAR
+                    return (EffectGenerator) ClassLoader.getSystemClassLoader().loadClass( "io.gomint.server.entity.potion.generator." + clazz.getSimpleName() + "Generator" ).newInstance();
+                } catch ( InstantiationException | IllegalAccessException | ClassNotFoundException e ) {
+                    e.printStackTrace();
+                }
+
                 return null;
             }
+        } );
 
-            try {
-                generatorCT.addMethod( CtNewMethod.make( "public io.gomint.server.entity.potion.effect.Effect generate( int amplifier, long lengthInMS ) { return new " + clazz.getName() + "( amplifier, lengthInMS ); }", generatorCT ) );
-            } catch ( CannotCompileException e ) {
-                e.printStackTrace();
-                return null;
-            }
-
-            try {
-                // Use the same code source as the Gomint JAR
-                return (EffectGenerator) generatorCT.toClass( ClassLoader.getSystemClassLoader(), null ).newInstance();
-            } catch ( InstantiationException | IllegalAccessException | CannotCompileException e ) {
-                e.printStackTrace();
-            }
-
-            return null;
-        }
-    } );
-
-    static {
-        GENERATORS.register( "io.gomint.server.entity.potion.effect" );
+        this.generators.register( "io.gomint.server.entity.potion.effect" );
     }
 
-    public static Effect generate( int id, int amplifier, long lengthInMS ) {
-        EffectGenerator instance = GENERATORS.getGenerator( id );
+    public Effect generate( int id, int amplifier, long lengthInMS ) {
+        EffectGenerator instance = this.generators.getGenerator( id );
         if ( instance != null ) {
             return instance.generate( amplifier, lengthInMS );
         }

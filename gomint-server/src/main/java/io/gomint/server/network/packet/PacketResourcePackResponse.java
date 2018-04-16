@@ -23,12 +23,12 @@ public class PacketResourcePackResponse extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
 
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
         this.status = ResourceResponseStatus.valueOf( buffer.readByte() );
         this.info = new ResourcePackInfo();
 

@@ -36,4 +36,9 @@ public class TrappedChest extends Block implements io.gomint.world.block.BlockTr
         return BlockType.TRAPPED_CHEST;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

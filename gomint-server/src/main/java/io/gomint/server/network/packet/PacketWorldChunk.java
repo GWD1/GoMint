@@ -29,7 +29,7 @@ public class PacketWorldChunk extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         buffer.writeSignedVarInt( this.x );
         buffer.writeSignedVarInt( this.z );
         buffer.writeUnsignedVarInt( this.data.length );
@@ -37,7 +37,7 @@ public class PacketWorldChunk extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

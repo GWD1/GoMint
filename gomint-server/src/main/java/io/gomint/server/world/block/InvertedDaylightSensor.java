@@ -36,4 +36,9 @@ public class InvertedDaylightSensor extends Block implements io.gomint.world.blo
         return BlockType.INVERTED_DAYLIGHT_SENSOR;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

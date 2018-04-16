@@ -36,4 +36,9 @@ public class MelonStem extends Block implements io.gomint.world.block.BlockMelon
         return BlockType.MELON_STEM;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

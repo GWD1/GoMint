@@ -36,4 +36,8 @@ public class Hopper extends Block implements io.gomint.world.block.BlockHopper {
         return BlockType.HOPPER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
 }

@@ -52,4 +52,6 @@ public class ChorusPlant extends Block implements io.gomint.world.block.BlockCho
         return BlockType.CHORUS_PLANT;
     }
 
+
+
 }

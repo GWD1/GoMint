@@ -48,4 +48,9 @@ public class Anvil extends Block implements io.gomint.world.block.BlockAnvil {
         return BlockType.ANVIL;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

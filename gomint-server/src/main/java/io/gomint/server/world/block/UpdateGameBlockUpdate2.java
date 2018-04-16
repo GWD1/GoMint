@@ -9,7 +9,7 @@ import io.gomint.server.registry.RegisterInfo;
  * @version 1.0
  */
 @RegisterInfo( id = 249 )
-public class UpdateGameBlockUpdate2 extends Block implements io.gomint.world.block.BlockUpdateGameBlockUpdate2 {
+public class UpdateGameBlockUpdate2 extends Block {
 
     @Override
     public int getBlockId() {
@@ -24,6 +24,11 @@ public class UpdateGameBlockUpdate2 extends Block implements io.gomint.world.blo
     @Override
     public BlockType getType() {
         return BlockType.UPDATE_GAME_BLOCK_UPDATE2;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

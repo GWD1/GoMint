@@ -16,7 +16,7 @@ import lombok.ToString;
  * @author geNAZt
  * @version 1.0
  */
-@EqualsAndHashCode( callSuper = false )
+@EqualsAndHashCode( callSuper = true )
 @ToString( callSuper = true )
 public class CancellablePlayerEvent extends CancellableEvent {
 

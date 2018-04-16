@@ -7,12 +7,8 @@
 
 package io.gomint.server.scheduler;
 
-import io.gomint.server.util.collection.ObjectBuffer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
-import java.lang.ref.SoftReference;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @param <T> type of Task
@@ -22,8 +18,6 @@ import java.util.concurrent.TimeUnit;
 public class TaskList<T> {
 
     private LongElement head;
-    private SoftReference<ObjectBuffer<TaskListNode>> buffer = new SoftReference<>( new ObjectBuffer<>( 10 ) );
-    private long lastRecalc = System.currentTimeMillis();
 
     /**
      * Add a new Element to the tasklist
@@ -32,22 +26,7 @@ public class TaskList<T> {
      * @param element which should be stored
      */
     public synchronized void add( long key, T element ) {
-        TaskListNode taskListNode = null;
-        ObjectBuffer<TaskListNode> buffer = this.buffer.get();
-        if ( buffer != null ) {
-            // Recalc the buffer
-            if ( key - this.lastRecalc >= TimeUnit.SECONDS.toMillis( 5 ) ) {
-                buffer.recalc();
-                this.lastRecalc = key;
-            }
-
-            taskListNode = buffer.get();
-        }
-
-        if ( taskListNode == null ) {
-            taskListNode = new TaskListNode( element, null );
-        }
-
+        TaskListNode taskListNode = new TaskListNode( element, null );
         taskListNode.setCurrent( element );
         taskListNode.setTail( null );
 
@@ -133,11 +112,6 @@ public class TaskList<T> {
         while ( this.head.getTaskListHead() == null ) {
             this.head = this.head.getNext();
             if ( this.head == null ) break;
-        }
-
-        ObjectBuffer<TaskListNode> buffer = this.buffer.get();
-        if ( buffer != null ) {
-            buffer.push( taskListNode );
         }
 
         return element;

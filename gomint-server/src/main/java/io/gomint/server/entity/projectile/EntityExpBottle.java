@@ -78,8 +78,8 @@ public class EntityExpBottle extends EntityThrowable implements io.gomint.entity
 
     private void breakBottle() {
         Location location = this.getLocation();
-        this.world.playParticle( location, Particle.MOB_SPELL, 0 );
-        this.world.playLevelEvent( location, LevelEvent.PARTICLE_SPLASH, 0x00385dc6 );
+        this.world.sendParticle( location, Particle.MOB_SPELL );
+        this.world.sendLevelEvent( location, LevelEvent.PARTICLE_SPLASH, 0x00385dc6 );
 
         int amountOfOrbs = 3 + FastRandom.current().nextInt( 8 );
         int add = 1;

@@ -8,6 +8,8 @@
 package io.gomint.server.async;
 
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -18,10 +20,13 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public class MultiOutputDelegate<T> implements Delegate<T> {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger( MultiOutputDelegate.class );
     @Getter private Queue<Delegate<T>> outputs = new LinkedBlockingQueue<>();
 
     @Override
     public void invoke( T arg ) {
+        LOGGER.debug( "Firing multi output delegate" );
+
         while ( !this.outputs.isEmpty() ) {
             this.outputs.poll().invoke( arg );
         }

@@ -13,6 +13,6 @@ public interface ItemReduceBreaktime extends ItemStack {
      *
      * @return divisor for the formula
      */
-    double getDivisor();
+    float getDivisor();
 
 }

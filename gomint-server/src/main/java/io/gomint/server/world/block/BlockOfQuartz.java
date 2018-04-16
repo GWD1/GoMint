@@ -1,7 +1,16 @@
 package io.gomint.server.world.block;
 
+import io.gomint.inventory.item.ItemDiamondPickaxe;
+import io.gomint.inventory.item.ItemGoldenPickaxe;
+import io.gomint.inventory.item.ItemIronPickaxe;
+import io.gomint.inventory.item.ItemStack;
+import io.gomint.inventory.item.ItemStonePickaxe;
+import io.gomint.inventory.item.ItemWoodenPickaxe;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.world.block.BlockType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author geNAZt
@@ -66,6 +75,28 @@ public class BlockOfQuartz extends Block implements io.gomint.world.block.BlockB
             default:
                 this.setBlockData( (byte) 0 );
         }
+    }
+
+    @Override
+    public Class<? extends ItemStack>[] getToolInterfaces() {
+        return new Class[]{
+            ItemWoodenPickaxe.class,
+            ItemStonePickaxe.class,
+            ItemGoldenPickaxe.class,
+            ItemIronPickaxe.class,
+            ItemDiamondPickaxe.class,
+        };
+    }
+
+    @Override
+    public List<ItemStack> getDrops( ItemStack itemInHand ) {
+        if ( isCorrectTool( itemInHand ) ) {
+            return new ArrayList<ItemStack>() {{
+                add( world.getServer().getItems().create( getBlockId() & 0xFF, getBlockData(), (byte) 1, null ) );
+            }};
+        }
+
+        return new ArrayList<>();
     }
 
 }

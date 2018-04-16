@@ -9,6 +9,7 @@ import java.util.List;
 
 /**
  * @author geNAZt
+ * @version 1.0
  */
 public class StepSlider extends Element implements io.gomint.gui.element.StepSlider {
 
@@ -52,6 +53,13 @@ public class StepSlider extends Element implements io.gomint.gui.element.StepSli
         obj.put( "steps", jsonSteps );
         obj.put( "default", this.defaultStep );
         return obj;
+    }
+
+    @Override
+    public Object getAnswer( Object answerOption ) {
+        String answer = (String) answerOption;
+        this.defaultStep = this.steps.indexOf( answer );
+        return answer;
     }
 
 }

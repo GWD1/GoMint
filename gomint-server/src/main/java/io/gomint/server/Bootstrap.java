@@ -17,8 +17,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -37,7 +35,6 @@ public class Bootstrap {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( Bootstrap.class );
 
-
     /**
      * Main entry point. May be used for custom dependency injection, dynamic
      * library class loaders and other experiments which need to be done before
@@ -46,11 +43,11 @@ public class Bootstrap {
      * @param args The command-line arguments to be passed to the entryClass
      */
     public static void main( String[] args ) {
-        // Check if classloader has been changed (it should be a URLClassLoader)
-        if ( !( ClassLoader.getSystemClassLoader() instanceof URLClassLoader ) ) {
-            System.out.println( "System Classloader is no URLClassloader" );
-            System.exit( -1 );
-        }
+        // For le performance
+        System.setSecurityManager( null );
+
+        // User agent
+        System.setProperty( "http.agent", "GoMint/1.0" );
 
         // Parse options first
         OptionParser parser = new OptionParser();
@@ -63,37 +60,37 @@ public class Bootstrap {
         // Check if we need to create the libs Folder
         File libsFolder = new File( "libs/" );
         if ( !libsFolder.exists() && !libsFolder.mkdirs() ) {
-            System.out.println( "Could not create library Directory" );
+            LOGGER.error( "Could not create library Directory" );
             System.exit( -1 );
         }
 
         // Check the libs (versions and artifacts)
-        if ( !options.has( "slc" ) ) // -slc (skip lib checking)
-        {
+        if ( !options.has( "slc" ) ) { // -slc (skip lib checking)
             checkLibs( libsFolder );
+        } else {
+            LOGGER.warn( "Excluding the library check can lead to weird behaviour. Please enable it before you submit issues" );
         }
 
-        File[] files = libsFolder.listFiles();
+        File[] files = libsFolder.listFiles( ( dir, name ) -> name.endsWith( ".jar" ) );
         if ( files == null ) {
-            System.out.println( "Library Directory is corrupted" );
+            LOGGER.error( "Library Directory is corrupted" );
             System.exit( -1 );
         }
 
         // Scan the libs/ Directory for .jar Files
-        for ( File file : files ) {
-            if ( file.getAbsolutePath().endsWith( ".jar" ) ) {
-                try {
-                    System.out.println( "Loading lib: " + file.getAbsolutePath() );
-                    addJARToClasspath( file );
-                } catch ( IOException e ) {
-                    e.printStackTrace();
-                }
+        URL[] fileURLs = new URL[files.length];
+        for ( int i = 0; i < files.length; i++ ) {
+            try {
+                LOGGER.info( "Loading lib: " + files[i].getAbsolutePath() );
+                fileURLs[i] = files[i].toURI().toURL();
+            } catch ( IOException e ) {
+                LOGGER.warn( "Error attaching library to system classpath: ", e );
             }
         }
 
         // Load the Class entrypoint
-        try {
-            Class<?> coreClass = ClassLoader.getSystemClassLoader().loadClass( "io.gomint.server.GoMintServer" );
+        try ( GomintClassLoader classLoader = new GomintClassLoader( fileURLs, ClassLoader.getSystemClassLoader() ) ) {
+            Class<?> coreClass = classLoader.loadClass( "io.gomint.server.GoMintServer" );
             Constructor constructor = coreClass.getDeclaredConstructor( OptionSet.class );
             constructor.newInstance( new Object[]{ options } );
         } catch ( Throwable t ) {
@@ -107,73 +104,78 @@ public class Bootstrap {
      * @param libsFolder in which the downloads should be stored
      */
     private static void checkLibs( File libsFolder ) {
-        // Check if we are able to skip this
-        if ( System.getProperty( "skip.libcheck", "false" ).equals( "true" ) ) {
-            return;
-        }
-
         // Load the dependency list
         try ( BufferedReader reader = new BufferedReader( new InputStreamReader( Bootstrap.class.getResourceAsStream( "/libs.dep" ) ) ) ) {
-            String libURL;
-            while ( ( libURL = reader.readLine() ) != null ) {
+            // Parse the line
+            String line;
+            while ( ( line = reader.readLine() ) != null ) {
                 // Check for comment
-                if ( libURL.isEmpty() || libURL.equals( System.getProperty( "line.separator" ) ) || libURL.startsWith( "#" ) ) {
+                if ( line.isEmpty() || line.equals( System.getProperty( "line.separator" ) ) || line.startsWith( "#" ) ) {
                     continue;
                 }
 
-                // Head first to get informations about the file
-                URL url = new URL( libURL );
-                HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-                urlConnection.setRequestMethod( "HEAD" );
+                // Extract the command mode
+                String[] splitCommand = line.split( "~" );
+                switch ( splitCommand[0] ) {
+                    case "delete":
+                        File toDelete = new File( libsFolder, splitCommand[1] );
+                        if ( toDelete.exists() ) {
+                            if ( !toDelete.delete() ) {
+                                LOGGER.error( "Could not delete old version of required lib. Please delete {}", splitCommand[1] );
+                                System.exit( -1 );
+                            } else {
+                                LOGGER.info( "Deleted old version of requried lib {}", splitCommand[1] );
+                            }
+                        }
 
-                // Filter out non java archive content types
-                if ( !"application/java-archive".equals( urlConnection.getHeaderField( "Content-Type" ) ) ) {
-                    System.out.println( "Skipping the download of " + libURL + " because its not a Java Archive" );
-                    continue;
+                        break;
+
+                    case "download":
+                        String libURL = splitCommand[1];
+
+                        // Head first to get informations about the file
+                        URL url = new URL( libURL );
+                        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+                        urlConnection.setConnectTimeout( 1000 );
+                        urlConnection.setReadTimeout( 1000 );
+                        urlConnection.setRequestMethod( "HEAD" );
+
+                        // Filter out non java archive content types
+                        if ( !"application/java-archive".equals( urlConnection.getHeaderField( "Content-Type" ) ) ) {
+                            LOGGER.debug( "Skipping the download of {} because its not a Java Archive", libURL );
+                            continue;
+                        }
+
+                        // We need the contentLength to compare
+                        int contentLength = Integer.parseInt( urlConnection.getHeaderField( "Content-Length" ) );
+
+                        String[] tempSplit = url.getPath().split( "/" );
+                        String fileName = tempSplit[tempSplit.length - 1];
+
+                        // Check if we have a file with the same length
+                        File libFile = new File( libsFolder, fileName );
+                        if ( libFile.exists() && libFile.length() == contentLength ) {
+                            LOGGER.debug( "Skipping the download of {} because there already is a correct sized copy", libURL );
+                            continue;
+                        }
+
+                        // Download the file from the Server
+                        Files.copy( url.openStream(), libFile.toPath(), StandardCopyOption.REPLACE_EXISTING );
+                        LOGGER.info( "Downloading library: {}", fileName );
+                        break;
                 }
-
-                // We need the contentLength to compare
-                int contentLength = Integer.parseInt( urlConnection.getHeaderField( "Content-Length" ) );
-
-                String[] tempSplit = url.getPath().split( "/" );
-                String fileName = tempSplit[tempSplit.length - 1];
-
-                // Check if we have a file with the same length
-                File libFile = new File( libsFolder, fileName );
-                if ( libFile.exists() && libFile.length() == contentLength ) {
-                    System.out.println( "Skipping the download of " + libURL + " because there already is a correct sized copy" );
-                    continue;
-                }
-
-                // Download the file from the Server
-                Files.copy( url.openStream(), libFile.toPath(), StandardCopyOption.REPLACE_EXISTING );
-                System.out.println( "Downloading library: " + fileName );
             }
         } catch ( IOException e ) {
-            e.printStackTrace();
+            LOGGER.error( "Could not download needed library: ", e );
         }
     }
 
-    /**
-     * Appends a JAR into the System Classloader
-     *
-     * @param moduleFile which should be added to the classpath
-     * @throws IOException
-     */
-    private static void addJARToClasspath( File moduleFile ) throws IOException {
-        URL moduleURL = moduleFile.toURI().toURL();
-        Class[] parameters = new Class[]{ URL.class };
+    private static class GomintClassLoader extends URLClassLoader {
 
-        ClassLoader sysloader = ClassLoader.getSystemClassLoader();
-        Class sysclass = URLClassLoader.class;
-
-        try {
-            Method method = sysclass.getDeclaredMethod( "addURL", parameters );
-            method.setAccessible( true );
-            method.invoke( sysloader, new Object[]{ moduleURL } );
-        } catch ( NoSuchMethodException | InvocationTargetException | IllegalAccessException e ) {
-            e.printStackTrace();
-            throw new IOException( "Error, could not add URL to system classloader" );
+        GomintClassLoader( URL[] urls, ClassLoader parent ) {
+            super( urls, parent );
         }
+
     }
+
 }

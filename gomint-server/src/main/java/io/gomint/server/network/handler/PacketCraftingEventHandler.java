@@ -1,5 +1,7 @@
 package io.gomint.server.network.handler;
 
+import io.gomint.event.player.PlayerCraftingEvent;
+import io.gomint.inventory.item.ItemAir;
 import io.gomint.inventory.item.ItemStack;
 import io.gomint.server.crafting.Recipe;
 import io.gomint.server.network.PlayerConnection;
@@ -68,90 +70,52 @@ public class PacketCraftingEventHandler implements PacketHandler<PacketCraftingE
             return;
         }
 
-        // Now we have to look if we have the correct items
-        ItemStack[] inputItems = connection.getEntity().getCraftingInputInventory().getContents();
-        boolean craftable = true;
-        for ( ItemStack recipeWanted : recipe.getIngredients() ) {
-            boolean found = false;
-            for ( ItemStack input : inputItems ) {
-                int recipeMaterial = ( (io.gomint.server.inventory.item.ItemStack) recipeWanted ).getMaterial();
-                int inputMaterial = ( (io.gomint.server.inventory.item.ItemStack) input ).getMaterial();
-
-                if ( recipeMaterial == inputMaterial &&
-                        ( recipeWanted.getData() == -1 || recipeWanted.getData() == input.getData() ) ) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if ( !found ) {
-                craftable = false;
-                break;
-            }
-        }
-
-        // Calculate the items we need to consume
-        List<ItemStack> available = new ArrayList<>( Arrays.asList( inputItems ) );
-        List<ItemStack> consume = new ArrayList<>();
-
-        // We need to consume every item in there
-        for ( ItemStack neededToConsume : packet.getInput() ) {
-            boolean didConsume = false;
-            for ( ItemStack canConsume : available ) {
-                int needToConsumeMaterial = ( (io.gomint.server.inventory.item.ItemStack) neededToConsume ).getMaterial();
-                int canConsumeMaterial = ( (io.gomint.server.inventory.item.ItemStack) canConsume ).getMaterial();
-
-                if ( needToConsumeMaterial == canConsumeMaterial &&
-                        ( neededToConsume.getData() == -1 || neededToConsume.getData() == canConsume.getData() ) ) {
-                    if ( canConsume.getAmount() > 0 ) {
-                        canConsume.setAmount( canConsume.getAmount() - 1 );
-
-                        boolean didFindAlreadyConsumed = false;
-                        for ( ItemStack alreadyConsumed : consume ) {
-                            if ( alreadyConsumed.equals( canConsume ) ) {
-                                alreadyConsumed.setAmount( alreadyConsumed.getAmount() + 1 );
-                                didFindAlreadyConsumed = true;
-                                break;
-                            }
-                        }
-
-                        if ( !didFindAlreadyConsumed ) {
-                            ItemStack canConsumeClone = ( (io.gomint.server.inventory.item.ItemStack) canConsume ).clone();
-                            canConsumeClone.setAmount( 1 );
-                            consume.add( canConsumeClone );
-                        }
-
-                        didConsume = true;
-                        break;
-                    }
-                }
-            }
-
-            if ( !didConsume ) {
-                craftable = false;
-                break;
-            }
-        }
-
-        // TODO: Event to cancel the crafting if needed
-
-
-        // We can craft this
-        if ( craftable ) {
-            for ( ItemStack itemStack : output ) {
-                connection.getEntity().getCraftingResultInventory().addItem( itemStack );
-            }
-
-            // Reset the inventory
-            connection.getEntity().getCraftingInputInventory().clear();
-        } else {
+        // Let the recipe check if it can complete
+        int[] consumeSlots = recipe.isCraftable( connection.getEntity().getCraftingInputInventory() );
+        boolean craftable = consumeSlots != null;
+        if ( !craftable ) {
             // We can't craft => reset inventory
-            for ( ItemStack inputItem : inputItems ) {
+            for ( ItemStack inputItem : connection.getEntity().getCraftingInputInventory().getContents() ) {
                 connection.getEntity().getInventory().addItem( inputItem );
             }
 
             connection.getEntity().getInventory().sendContents( connection );
             connection.getEntity().getCraftingInputInventory().clear();
+            return;
+        }
+
+        PlayerCraftingEvent event = new PlayerCraftingEvent( connection.getEntity(), recipe );
+        connection.getEntity().getWorld().getServer().getPluginManager().callEvent( event );
+
+        if ( event.isCancelled() ) {
+            // We can't craft => reset inventory
+            for ( ItemStack inputItem : connection.getEntity().getCraftingInputInventory().getContents() ) {
+                connection.getEntity().getInventory().addItem( inputItem );
+            }
+
+            connection.getEntity().getInventory().sendContents( connection );
+            connection.getEntity().getCraftingInputInventory().clear();
+            return;
+        }
+
+        // Consume items
+        for ( int slot : consumeSlots ) {
+            LOGGER.debug( "Consuming slot {}", slot );
+
+            io.gomint.server.inventory.item.ItemStack itemStack = (io.gomint.server.inventory.item.ItemStack) connection.getEntity().getCraftingInputInventory().getItem( slot );
+            LOGGER.debug( "ItemStack before {}", itemStack );
+            if ( itemStack.afterPlacement() ) {
+                LOGGER.debug( "Removing slot from crafting input" );
+                connection.getEntity().getCraftingInputInventory().setItem( slot, ItemAir.create( 0 ) );
+            } else {
+                LOGGER.debug( "Remaining input at slot: {}", itemStack.getAmount() );
+                connection.getEntity().getCraftingInputInventory().setItem( slot, itemStack );
+            }
+        }
+
+        // We can craft this
+        for ( ItemStack itemStack : output ) {
+            connection.getEntity().getCraftingResultInventory().addItem( itemStack );
         }
     }
 

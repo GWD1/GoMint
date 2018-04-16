@@ -31,4 +31,9 @@ public class Cobblestone extends Block implements io.gomint.world.block.BlockCob
         return BlockType.COBBLESTONE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

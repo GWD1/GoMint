@@ -32,7 +32,7 @@ public abstract class ItemReduceTierSpecial extends ItemStack implements ItemRed
     }
 
     @Override
-    public double getDivisor() {
+    public float getDivisor() {
         return 15;
     }
 

@@ -31,4 +31,9 @@ public class SoulSand extends Block implements io.gomint.world.block.BlockSoulSa
         return BlockType.SOUL_SAND;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

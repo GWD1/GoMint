@@ -31,4 +31,9 @@ public class BlockMovedByPiston extends Block implements io.gomint.world.block.B
         return BlockType.BLOCK_MOVED_BY_PISTON;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

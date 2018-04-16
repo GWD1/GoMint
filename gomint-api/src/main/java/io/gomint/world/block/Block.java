@@ -28,13 +28,6 @@ public interface Block {
     BlockType getType();
 
     /**
-     * Gets the block's data value (0 - 15)
-     *
-     * @return The block's data value
-     */
-    byte getBlockData();
-
-    /**
      * Get the level of skylight this block has
      *
      * @return The skylight data of this block
@@ -79,6 +72,24 @@ public interface Block {
     <T extends Block> T setType( Class<T> blockType );
 
     /**
+     * Set the data and tiles from a block which has been on the same position before
+     *
+     * @param block which should be set
+     * @param <T> type of block
+     * @return null when location doesn't match, block when set
+     */
+    <T extends Block> T setFromBlock( T block );
+
+    /**
+     * Copy all data from the given block to this block
+     *
+     * @param block which should be set
+     * @param <T> type of block
+     * @return new block
+     */
+    <T extends Block> T copyFromBlock( T block );
+
+    /**
      * Can a bounding box pass through this block?
      *
      * @return if a bounding box can pass though or not
@@ -105,7 +116,7 @@ public interface Block {
      * @param face for which we want the block
      * @return attached block
      */
-    Block getSide( int face );
+    Block getSide( BlockFace face );
 
     /**
      * Get a list of drops which will be dropped when using the given tool
@@ -114,5 +125,13 @@ public interface Block {
      * @return list of item stacks which can be used as drops
      */
     List<ItemStack> getDrops( ItemStack toolItem );
+
+    /**
+     * This method tells you if you can modify the block. A block gets unmodifiable
+     * when the block id in the same location differs ({@link #setType(Class)}.
+     *
+     * @return true when the block has been placed in the world, false when not
+     */
+    boolean isPlaced();
 
 }

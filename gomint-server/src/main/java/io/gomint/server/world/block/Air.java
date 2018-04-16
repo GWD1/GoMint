@@ -53,4 +53,9 @@ public class Air extends Block implements BlockAir {
         return BlockType.AIR;
     }
 
+    @Override
+    public boolean canBeFlowedInto() {
+        return true;
+    }
+
 }

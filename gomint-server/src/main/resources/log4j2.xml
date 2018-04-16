@@ -8,8 +8,8 @@
 
 <Configuration status="INFO">
     <Appenders>
-        <TerminalConsole  name="Console">
-            <PatternLayout pattern="%highlight{%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n}{FATAL=red, ERROR=red, WARN=yellow, INFO=normal, DEBUG=teal}"/>
+        <TerminalConsole name="Console">
+            <PatternLayout pattern="%highlight{%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %minecraftFormatting{%msg}%n}{FATAL=red, ERROR=red, WARN=yellow, INFO=normal, DEBUG=teal}"/>
         </TerminalConsole>
 
         <RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">

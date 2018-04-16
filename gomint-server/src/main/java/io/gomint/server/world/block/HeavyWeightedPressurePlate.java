@@ -55,4 +55,8 @@ public class HeavyWeightedPressurePlate extends Block implements io.gomint.world
         return BlockType.HEAVY_WEIGHTED_PRESSURE_PLATE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
 }

@@ -7,8 +7,6 @@ import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.world.block.*;
 import io.gomint.taglib.NBTTagCompound;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author geNAZt
@@ -16,8 +14,6 @@ import org.slf4j.LoggerFactory;
  */
 @RegisterInfo( id = 325 )
 public class ItemBucket extends ItemStack implements io.gomint.inventory.item.ItemBucket {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger( ItemBucket.class );
 
     // CHECKSTYLE:OFF
     public ItemBucket( short data, int amount ) {
@@ -87,7 +83,7 @@ public class ItemBucket extends ItemStack implements io.gomint.inventory.item.It
     }
 
     @Override
-    public boolean interact( EntityPlayer entity, int face, Vector clickPosition, Block clickedBlock ) {
+    public boolean interact( EntityPlayer entity, BlockFace face, Vector clickPosition, Block clickedBlock ) {
         if ( clickedBlock != null ) {
             Block liquidBlock = clickedBlock.getSide( face );
             if ( liquidBlock instanceof BlockLiquid ) {

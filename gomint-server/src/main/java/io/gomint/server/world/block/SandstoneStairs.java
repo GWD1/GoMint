@@ -43,4 +43,9 @@ public class SandstoneStairs extends Stairs {
         return BlockType.SANDSTONE_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

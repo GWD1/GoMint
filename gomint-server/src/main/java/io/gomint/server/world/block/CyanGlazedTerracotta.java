@@ -31,4 +31,9 @@ public class CyanGlazedTerracotta extends Block implements io.gomint.world.block
         return BlockType.CYAN_GLAZED_TERRACOTTA;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -31,4 +31,9 @@ public class DarkOakFenceGate extends Block implements io.gomint.world.block.Blo
         return BlockType.DARK_OAK_FENCE_GATE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

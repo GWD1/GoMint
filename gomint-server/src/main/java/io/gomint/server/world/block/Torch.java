@@ -36,4 +36,9 @@ public class Torch extends Block implements io.gomint.world.block.BlockTorch {
         return BlockType.TORCH;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

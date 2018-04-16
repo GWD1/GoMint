@@ -46,4 +46,9 @@ public class Dandelion extends Block implements io.gomint.world.block.BlockDande
         return BlockType.DANDELION;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

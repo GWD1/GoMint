@@ -49,17 +49,15 @@ public class Initializer {
                                    final ConnectionHandler connectionHandler = new ConnectionHandler();
                                    Pipeline.prepare( ch.pipeline(), connectionHandler );
 
-                                   connectionHandler.whenConnected( new Consumer<Void>() {
-                                       @Override
-                                       public void accept( Void aVoid ) {
-                                           newConnection.accept( connectionHandler );
-                                       }
-                                   } );
+                                   connectionHandler.whenConnected( aVoid -> newConnection.accept( connectionHandler ) );
                                }
                            }
             );
     }
 
+    /**
+     * Close the underlying event loop and its threads
+     */
     public static void close() {
         EVENT_LOOP_GROUP.shutdownGracefully().syncUninterruptibly();
     }

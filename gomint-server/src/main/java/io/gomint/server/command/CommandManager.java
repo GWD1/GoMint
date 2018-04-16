@@ -32,11 +32,13 @@ public class CommandManager {
 
     /**
      * Create a new command manager
+     *
+     * @param server which started
      */
-    public CommandManager() {
+    public CommandManager( GoMintServer server ) {
         // Register all internal commands
         try {
-            for ( ClassPath.ClassInfo classInfo : GoMintServer.getClassPath().getTopLevelClasses( "io.gomint.server.command.internal" ) ) {
+            for ( ClassPath.ClassInfo classInfo : server.getClassPath().getTopLevelClasses( "io.gomint.server.command.internal" ) ) {
                 // Check for system only commands
                 Class<?> cmdClass = classInfo.load();
                 Object commandObject = null;

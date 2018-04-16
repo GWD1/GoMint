@@ -31,4 +31,9 @@ public class LimeGlazedTerracotta extends Block implements io.gomint.world.block
         return BlockType.LIME_GLAZED_TERRACOTTA;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -4,6 +4,7 @@ import io.gomint.inventory.item.ItemStack;
 
 /**
  * @author geNAZt
+ * @version 1.0
  */
 public interface PlayerInventory extends Inventory {
 
@@ -20,5 +21,12 @@ public interface PlayerInventory extends Inventory {
      * @return index of item in hand
      */
     byte getItemInHandSlot();
+
+    /**
+     * Set the item in hand slot for the player
+     *
+     * @param slot which should be the new item in hand
+     */
+    void setItemInHandSlot( byte slot );
 
 }

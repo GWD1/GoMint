@@ -7,10 +7,13 @@
 
 package io.gomint.server.entity;
 
+import io.gomint.entity.BossBar;
 import io.gomint.event.entity.EntityDamageEvent;
+import io.gomint.event.entity.EntityTeleportEvent;
 import io.gomint.math.*;
 import io.gomint.server.entity.component.TransformComponent;
 import io.gomint.server.entity.metadata.MetadataContainer;
+import io.gomint.server.network.PlayerConnection;
 import io.gomint.server.network.packet.Packet;
 import io.gomint.server.network.packet.PacketEntityMetadata;
 import io.gomint.server.network.packet.PacketEntityMotion;
@@ -19,13 +22,16 @@ import io.gomint.server.util.Values;
 import io.gomint.server.world.CoordinateUtils;
 import io.gomint.server.world.WorldAdapter;
 import io.gomint.server.world.block.*;
+import io.gomint.taglib.NBTTagCompound;
 import io.gomint.world.Chunk;
 import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
@@ -84,6 +90,8 @@ public abstract class Entity implements io.gomint.entity.Entity {
     protected boolean isCollidedVertically;
     protected boolean isCollidedHorizontally;
     protected boolean isCollided;
+    protected Set<Block> collidedWith = new HashSet<>();
+    private boolean stuckInBlock = false;
     // CHECKSTYLE:ON
 
     /**
@@ -96,11 +104,15 @@ public abstract class Entity implements io.gomint.entity.Entity {
      */
     @Getter
     protected float eyeHeight;
+    @Getter
+    protected float offsetY;
 
     /**
      * Dead status
      */
-    @Getter @Setter private boolean dead;
+    @Getter
+    @Setter
+    private boolean dead;
     protected int age;
 
     @Setter
@@ -110,8 +122,20 @@ public abstract class Entity implements io.gomint.entity.Entity {
     @Getter
     private List<EntityLink> links;
 
+    @Setter
+    @Getter
+    protected boolean ticking = true;
+
     // Some tracker for "smooth" movement
     private int stuckInBlockTicks = 0;
+
+    private io.gomint.server.entity.BossBar bossBar;
+
+    /**
+     * Hidden status
+     */
+    private boolean hideByDefault;
+    private Set<EntityPlayer> shownFor;
 
     /**
      * Construct a new Entity
@@ -127,6 +151,7 @@ public abstract class Entity implements io.gomint.entity.Entity {
         this.metadataContainer.putLong( MetadataContainer.DATA_INDEX, 0 );
         this.metadataContainer.putInt( MetadataContainer.DATA_VARIANT, 0 );
         this.metadataContainer.putInt( MetadataContainer.DATA_POTION_COLOR, 0 );
+        this.setScale( 1.0f );
         this.transform = new TransformComponent();
         this.boundingBox = new AxisAlignedBB( 0, 0, 0, 0, 0, 0 );
 
@@ -220,6 +245,7 @@ public abstract class Entity implements io.gomint.entity.Entity {
                     float newMovZ = this.transform.getMotionZ() * friction;
 
                     this.transform.setMotion( newMovX, newMovY, newMovZ );
+                    this.checkAfterGravity();
                 }
 
                 if ( moved != null ) {
@@ -238,8 +264,27 @@ public abstract class Entity implements io.gomint.entity.Entity {
                 }
             }
 
+            // Check for block collision
+            List<io.gomint.world.block.Block> blockList = this.world.getCollisionBlocks( this, true );
+            if ( blockList != null ) {
+                Vector pushedByBlocks = new Vector( 0, 0, 0 );
+
+                for ( io.gomint.world.block.Block block : blockList ) {
+                    io.gomint.server.world.block.Block implBlock = (io.gomint.server.world.block.Block) block;
+                    implBlock.onEntityCollision( this );
+                    implBlock.addVelocity( this, pushedByBlocks );
+                }
+
+                if ( pushedByBlocks.length() > 0 ) {
+                    pushedByBlocks.normalize().multiply( 0.014f );
+                    Vector newMotion = this.transform.getMotion().add( pushedByBlocks );
+                    this.transform.setMotion( newMotion.getX(), newMotion.getY(), newMotion.getZ() );
+                    this.broadCastMotion();
+                }
+            }
+
             // Check for void damage
-            if ( this.getPositionY() < -64F ) {
+            if ( this.getPositionY() < -16.0f ) {
                 this.dealVoidDamage();
             }
 
@@ -259,6 +304,13 @@ public abstract class Entity implements io.gomint.entity.Entity {
 
             this.transform.move( 0, 0, 0 );
         }
+    }
+
+    /**
+     * Allow for custom capping of gravity
+     */
+    protected void checkAfterGravity() {
+
     }
 
     protected boolean shouldMove() {
@@ -287,10 +339,16 @@ public abstract class Entity implements io.gomint.entity.Entity {
 
         // Check if we collide with some blocks when we would move that fast
         List<AxisAlignedBB> collisionList = this.world.getCollisionCubes( this, this.boundingBox.getOffsetBoundingBox( dX, dY, dZ ), false );
-        if ( collisionList != null ) {
+        if ( collisionList != null && !this.stuckInBlock) {
             // Check if we would hit a y border block
             for ( AxisAlignedBB axisAlignedBB : collisionList ) {
                 dY = axisAlignedBB.calculateYOffset( this.boundingBox, dY );
+                if ( dY != movY ) {
+                    Block block = this.world.getBlockAt( (int) axisAlignedBB.getMinX(), (int) axisAlignedBB.getMinY(), (int) axisAlignedBB.getMinZ() );
+                    LOGGER.debug( "Entity {} collided with {}", this, block );
+
+                    this.collidedWith.add( block );
+                }
             }
 
             this.boundingBox.offset( 0, dY, 0 );
@@ -298,6 +356,12 @@ public abstract class Entity implements io.gomint.entity.Entity {
             // Check if we would hit a x border block
             for ( AxisAlignedBB axisAlignedBB : collisionList ) {
                 dX = axisAlignedBB.calculateXOffset( this.boundingBox, dX );
+                if ( dX != movX ) {
+                    Block block = this.world.getBlockAt( (int) axisAlignedBB.getMinX(), (int) axisAlignedBB.getMinY(), (int) axisAlignedBB.getMinZ() );
+                    LOGGER.debug( "Entity {} collided with {}", this, block );
+
+                    this.collidedWith.add( block );
+                }
             }
 
             this.boundingBox.offset( dX, 0, 0 );
@@ -305,6 +369,12 @@ public abstract class Entity implements io.gomint.entity.Entity {
             // Check if we would hit a z border block
             for ( AxisAlignedBB axisAlignedBB : collisionList ) {
                 dZ = axisAlignedBB.calculateZOffset( this.boundingBox, dZ );
+                if ( dZ != movZ ) {
+                    Block block = this.world.getBlockAt( (int) axisAlignedBB.getMinX(), (int) axisAlignedBB.getMinY(), (int) axisAlignedBB.getMinZ() );
+                    LOGGER.debug( "Entity {} collided with {}", this, block );
+
+                    this.collidedWith.add( block );
+                }
             }
 
             this.boundingBox.offset( 0, 0, dZ );
@@ -362,12 +432,14 @@ public abstract class Entity implements io.gomint.entity.Entity {
             }
         }
 
-        // Move by new bounding box
-        this.transform.setPosition(
-            ( this.boundingBox.getMinX() + this.boundingBox.getMaxX() ) / 2,
-            this.boundingBox.getMinY(),
-            ( this.boundingBox.getMinZ() + this.boundingBox.getMaxZ() ) / 2
-        );
+        if ( dX != 0 || dY != 0 || dZ != 0 ) {
+            // Move by new bounding box
+            this.transform.setPosition(
+                ( this.boundingBox.getMinX() + this.boundingBox.getMaxX() ) / 2,
+                this.boundingBox.getMinY(),
+                ( this.boundingBox.getMinZ() + this.boundingBox.getMaxZ() ) / 2
+            );
+        }
 
         // Check for grounding states
         this.checkIfCollided( movX, movY, movZ, dX, dY, dZ );
@@ -381,6 +453,11 @@ public abstract class Entity implements io.gomint.entity.Entity {
         return new Vector( dX, dY, dZ );
     }
 
+    /**
+     * Does this entity needs to be pushed out of blocks when stuck?
+     *
+     * @return true or false, depending of it needing to be pushed
+     */
     protected boolean needsToBePushedOutOfBlocks() {
         return true;
     }
@@ -403,7 +480,7 @@ public abstract class Entity implements io.gomint.entity.Entity {
      */
     protected abstract void fall();
 
-    void checkIfCollided( float movX, float movY, float movZ, float dX, float dY, float dZ ) {
+    protected void checkIfCollided( float movX, float movY, float movZ, float dX, float dY, float dZ ) {
         // Check if we collided with something
         this.isCollidedVertically = movY != dY;
         this.isCollidedHorizontally = ( movX != dX || movZ != dZ );
@@ -418,17 +495,15 @@ public abstract class Entity implements io.gomint.entity.Entity {
         int fullBlockZ = MathUtils.fastFloor( this.transform.getPositionZ() );
 
         // Are we stuck inside a block?
-        Block block;
-        if ( ( block = this.world.getBlockAt( fullBlockX, fullBlockY, fullBlockZ ) ).isSolid() &&
-            block.getBoundingBox().intersectsWith( this.boundingBox ) ) {
+        Block block = this.world.getBlockAt( fullBlockX, fullBlockY, fullBlockZ );
+        if ( block.isSolid() && block.getBoundingBox().intersectsWith( this.boundingBox ) ) {
             // We need to check for "smooth" movement when its a player (it climbs .5 steps in .3 -> .420 -> .468 .487 .495 .498 .499 steps
-            if ( this instanceof EntityPlayer ) {
-                if ( this.stuckInBlockTicks++ <= 20 ) { // Yes we can "smooth" for up to 20 ticks, thanks mojang :D
-                    return;
-                }
+            if ( this instanceof EntityPlayer && ( this.stuckInBlockTicks++ <= 20 || ( (EntityPlayer) this ).getAdventureSettings().isNoClip() ) ) { // Yes we can "smooth" for up to 20 ticks, thanks mojang :D
+                return;
             }
 
-            LOGGER.debug( "Entity " + this.getClass().getSimpleName() + "(" + getEntityId() + ") [" + this.stuckInBlockTicks + "] @" + getLocation().toVector() + " is stuck in a block " + block.getClass().getSimpleName() + "@" + block.getLocation().toVector() + " -> " + block.getBoundingBox() );
+            LOGGER.debug( "Entity {}({}) [{}] @ {} is stuck in a block {} @ {} -> {}",
+                this.getClass().getSimpleName(), this.getEntityId(), this.stuckInBlockTicks, this.getLocation().toVector(), block.getClass().getSimpleName(), block.getLocation().toVector(), block.getBoundingBox() );
 
             // Calc with how much force we can get out of here, this depends on how far we are in
             float diffX = this.transform.getPositionX() - fullBlockX;
@@ -507,8 +582,10 @@ public abstract class Entity implements io.gomint.entity.Entity {
                     break;
             }
 
+            this.stuckInBlock = true;
             this.broadCastMotion();
         } else {
+            this.stuckInBlock = false;
             this.stuckInBlockTicks = 0;
         }
     }
@@ -552,7 +629,7 @@ public abstract class Entity implements io.gomint.entity.Entity {
         this.world.sendToVisible( this.transform.getPosition().toBlockPosition(), motion, new Predicate<io.gomint.entity.Entity>() {
             @Override
             public boolean test( io.gomint.entity.Entity entity ) {
-                return true;
+                return entity instanceof EntityPlayer && ( (EntityPlayer) entity ).getEntityVisibilityManager().isVisible( Entity.this );
             }
         } );
     }
@@ -684,19 +761,13 @@ public abstract class Entity implements io.gomint.entity.Entity {
         this.transform.setPitch( pitch );
     }
 
-    /**
-     * Gets the direction the entity's body is facing as a normalized vector.
-     * Note, though, that pitch rotation is considered to be part of the entity's
-     * head and is thus not included inside the vector returned by this function.
-     *
-     * @return The direction vector the entity's body is facing
-     */
+    @Override
     public Vector getDirection() {
         return this.transform.getDirection();
     }
 
     @Override
-    public Vector2 getDirectionVector() {
+    public Vector2 getDirectionPlane() {
         return ( new Vector2( (float) -Math.cos( Math.toRadians( this.transform.getYaw() ) - ( Math.PI / 2 ) ),
             (float) -Math.sin( Math.toRadians( this.transform.getYaw() ) - ( Math.PI / 2 ) ) ) ).normalize();
     }
@@ -788,7 +859,7 @@ public abstract class Entity implements io.gomint.entity.Entity {
         int chunkX = CoordinateUtils.fromBlockToChunk( (int) this.getPositionX() );
         int chunkZ = CoordinateUtils.fromBlockToChunk( (int) this.getPositionZ() );
 
-        return this.world.getChunk( chunkX, chunkZ );
+        return this.world.loadChunk( chunkX, chunkZ, true );
     }
 
     /**
@@ -831,10 +902,12 @@ public abstract class Entity implements io.gomint.entity.Entity {
         return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.HAS_COLLISION );
     }
 
+    @Override
     public void setImmobile( boolean value ) {
         this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.IMMOBILE, value );
     }
 
+    @Override
     public boolean isImmobile() {
         return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.IMMOBILE );
     }
@@ -845,6 +918,16 @@ public abstract class Entity implements io.gomint.entity.Entity {
 
     public boolean isAffectedByGravity() {
         return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.AFFECTED_BY_GRAVITY );
+    }
+
+    @Override
+    public String getNameTag() {
+        return this.metadataContainer.getString( MetadataContainer.DATA_NAMETAG );
+    }
+
+    @Override
+    public void setNameTag( String nameTag ) {
+        this.metadataContainer.putString( MetadataContainer.DATA_NAMETAG, nameTag );
     }
 
     @Override
@@ -867,12 +950,24 @@ public abstract class Entity implements io.gomint.entity.Entity {
         return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.CAN_SHOW_NAMETAG );
     }
 
+    @Override
     public void setOnFire( boolean value ) {
         this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.ONFIRE, value );
     }
 
+    @Override
     public boolean isOnFire() {
         return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.ONFIRE );
+    }
+
+    @Override
+    public void setInvisible( boolean value ) {
+        this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.INVISIBLE, value );
+    }
+
+    @Override
+    public boolean isInvisible() {
+        return this.metadataContainer.getDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.INVISIBLE );
     }
 
     /**
@@ -900,7 +995,7 @@ public abstract class Entity implements io.gomint.entity.Entity {
         PacketEntityMetadata metadataPacket = new PacketEntityMetadata();
         metadataPacket.setEntityId( this.getEntityId() );
         metadataPacket.setMetadata( this.metadataContainer );
-        player.getConnection().send( metadataPacket );
+        player.getConnection().addToSendQueue( metadataPacket );
     }
 
     @Override
@@ -1030,9 +1125,162 @@ public abstract class Entity implements io.gomint.entity.Entity {
         this.world.spawnEntityAt( this, location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch() );
     }
 
+    public void teleport( Location to, EntityTeleportEvent.Cause cause ) {
+        EntityTeleportEvent entityTeleportEvent = new EntityTeleportEvent( this, this.getLocation(), to, cause );
+        this.world.getServer().getPluginManager().callEvent( entityTeleportEvent );
+        if ( entityTeleportEvent.isCancelled() ) {
+            return;
+        }
+
+        WorldAdapter actualWorld = this.getWorld();
+
+        this.setAndRecalcPosition( to );
+
+        if ( !to.getWorld().equals( actualWorld ) ) {
+            actualWorld.removeEntity( this );
+            this.setWorld( (WorldAdapter) to.getWorld() );
+            ( (WorldAdapter) to.getWorld() ).spawnEntityAt( this, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch() );
+        }
+
+        this.fallDistance = 0;
+    }
+
+    @Override
+    public void teleport( Location to ) {
+        this.teleport( to, EntityTeleportEvent.Cause.CUSTOM );
+    }
+
     @Override
     public void setAge( long duration, TimeUnit unit ) {
         this.age = MathUtils.fastFloor( unit.toMillis( duration ) / 50f );
+    }
+
+    @Override
+    public BossBar getBossBar() {
+        return this.bossBar != null ? this.bossBar : ( this.bossBar = new io.gomint.server.entity.BossBar( this ) );
+    }
+
+    /**
+     * Pre spawn packets when needed
+     *
+     * @param connection which is used to spawn this entity to
+     */
+    public void preSpawn( PlayerConnection connection ) {
+
+    }
+
+    /**
+     * Post spawn packets when needed
+     *
+     * @param connection which is used to spawn this entity to
+     */
+    public void postSpawn( PlayerConnection connection ) {
+
+    }
+
+    @Override
+    public void setScale( float scale ) {
+        this.metadataContainer.putFloat( MetadataContainer.DATA_SCALE, scale );
+    }
+
+    @Override
+    public float getScale() {
+        return this.metadataContainer.getFloat( MetadataContainer.DATA_SCALE );
+    }
+
+    @Override
+    public void setHiddenByDefault( boolean value ) {
+        if ( this instanceof EntityPlayer ) {
+            return;
+        }
+
+        if ( !this.hideByDefault && value && this.world != null ) {
+            // Despawn
+            for ( io.gomint.entity.EntityPlayer entityPlayer : this.world.getPlayers() ) {
+                EntityPlayer entityPlayer1 = (EntityPlayer) entityPlayer;
+                entityPlayer1.getEntityVisibilityManager().removeEntity( this );
+            }
+        }
+
+        this.shownFor = new HashSet<>();
+        this.hideByDefault = value;
+    }
+
+    @Override
+    public void showFor( io.gomint.entity.EntityPlayer player ) {
+        ( (EntityPlayer) player ).getEntityVisibilityManager().addEntity( this );
+
+        if ( this.shownFor != null ) {
+            this.shownFor.add( (EntityPlayer) player );
+        }
+    }
+
+    @Override
+    public void hideFor( io.gomint.entity.EntityPlayer player ) {
+        ( (EntityPlayer) player ).getEntityVisibilityManager().removeEntity( this );
+
+        if ( this.shownFor != null ) {
+            this.shownFor.remove( player );
+        }
+    }
+
+    /**
+     * Check if a player can see this entity
+     *
+     * @param player for which we check
+     * @return true when visible, false when not
+     */
+    public boolean canSee( EntityPlayer player ) {
+        return !this.hideByDefault || player.getEntityVisibilityManager().isVisible( this );
+    }
+
+    /**
+     * Check if a player should be able to see this entity
+     *
+     * @param player for which we check
+     * @return true when it should be visible, false when not
+     */
+    public boolean shouldBeSeen( EntityPlayer player ) {
+        return !this.hideByDefault || this.shownFor.contains( player );
+    }
+
+    /**
+     * Take over configuration from the given compound
+     *
+     * @param compound which holds entity data
+     */
+    public void initFromNBT( NBTTagCompound compound ) {
+        // Read position
+        List<Object> pos = compound.getList( "Pos", false );
+        if ( pos != null ) {
+            // Data in the array are three floats (x, y, z)
+            float x = (float) pos.get( 0 );
+            float y = (float) pos.get( 1 );
+            float z = (float) pos.get( 2 );
+
+            this.setPosition( x, y, z );
+        }
+
+        // Now we read motion
+        List<Object> motion = compound.getList( "Motion", false );
+        if ( motion != null ) {
+            // Data in the array are three floats (x, y, z)
+            float x = (float) motion.get( 0 );
+            float y = (float) motion.get( 1 );
+            float z = (float) motion.get( 2 );
+
+            this.transform.setMotion( x, y, z );
+        }
+
+        // Read rotation
+        List<Object> rotation = compound.getList( "Rotation", false );
+        if ( rotation != null ) {
+            float yaw = (float) rotation.get( 0 );
+            float pitch = (float) rotation.get( 1 );
+
+            this.setYaw( yaw );
+            this.setPitch( pitch );
+        }
     }
 
 }

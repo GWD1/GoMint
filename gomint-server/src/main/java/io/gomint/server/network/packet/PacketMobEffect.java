@@ -39,7 +39,7 @@ public class PacketMobEffect extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         buffer.writeUnsignedVarLong( this.entityId );
         buffer.writeByte( this.action );
         buffer.writeSignedVarInt( this.effectId );
@@ -49,7 +49,7 @@ public class PacketMobEffect extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

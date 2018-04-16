@@ -1,12 +1,10 @@
 package io.gomint.server.world.block;
 
-import io.gomint.world.block.BlockType;
-
 import io.gomint.inventory.item.ItemStack;
-import io.gomint.server.inventory.item.Items;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.server.util.random.FastRandom;
 import io.gomint.world.block.BlockPotato;
+import io.gomint.world.block.BlockType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,17 +45,17 @@ public class Potato extends Growable implements BlockPotato {
     public List<ItemStack> getDrops( ItemStack itemInHand ) {
         if ( getBlockData() >= 0x07 ) {
             List<ItemStack> drops = new ArrayList<ItemStack>() {{
-                add( Items.create( 392, (short) 0, (byte) ( 1 + SEED_RANDOMIZER.next().byteValue() ), null ) ); // Potato
+                add( world.getServer().getItems().create( 392, (short) 0, (byte) ( 1 + SEED_RANDOMIZER.next().byteValue() ), null ) ); // Potato
             }};
 
             if ( FastRandom.current().nextDouble() > 0.98 ) {
-                drops.add( Items.create( 394, (short) 0, (byte) 1, null ) ); // Poison potato on top!
+                drops.add( world.getServer().getItems().create( 394, (short) 0, (byte) 1, null ) ); // Poison potato on top!
             }
 
             return drops;
         } else {
             return new ArrayList<ItemStack>() {{
-                add( Items.create( 392, (short) 0, (byte) 1, null ) ); // Potato
+                add( world.getServer().getItems().create( 392, (short) 0, (byte) 1, null ) ); // Potato
             }};
         }
     }
@@ -70,6 +68,11 @@ public class Potato extends Growable implements BlockPotato {
     @Override
     public BlockType getType() {
         return BlockType.POTATO;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

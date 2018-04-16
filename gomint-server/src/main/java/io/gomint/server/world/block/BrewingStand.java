@@ -36,4 +36,9 @@ public class BrewingStand extends Block implements io.gomint.world.block.BlockBr
         return BlockType.BREWING_STAND;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

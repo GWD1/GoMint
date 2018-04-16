@@ -36,4 +36,9 @@ public class SnowLayer extends Block implements io.gomint.world.block.BlockSnowL
         return BlockType.SNOW_LAYER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

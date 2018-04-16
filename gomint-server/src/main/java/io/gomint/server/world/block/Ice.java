@@ -36,4 +36,9 @@ public class Ice extends Block implements io.gomint.world.block.BlockIce {
         return BlockType.ICE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

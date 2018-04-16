@@ -54,4 +54,9 @@ public class LightWeightedPressurePlate extends Block implements io.gomint.world
         return BlockType.LIGHT_WEIGHTED_PRESSURE_PLATE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

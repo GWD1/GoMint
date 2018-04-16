@@ -1,5 +1,6 @@
 package io.gomint.server.world.block;
 
+import io.gomint.world.block.BlockFace;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.server.entity.Entity;
@@ -30,7 +31,7 @@ public class CraftingTable extends Block implements io.gomint.world.block.BlockC
     }
 
     @Override
-    public boolean interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public boolean interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         if ( entity instanceof EntityPlayer ) {
             // This should be a container open
             LOGGER.debug( "Changing to 3x3 crafting grid for player " + ( (EntityPlayer) entity ).getName() );
@@ -49,6 +50,11 @@ public class CraftingTable extends Block implements io.gomint.world.block.BlockC
     @Override
     public BlockType getType() {
         return BlockType.CRAFTING_TABLE;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

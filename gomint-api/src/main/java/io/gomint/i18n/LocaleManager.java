@@ -15,6 +15,8 @@ import io.gomint.i18n.localization.loader.PropertiesResourceLoader;
 import io.gomint.plugin.Plugin;
 import lombok.Getter;
 import lombok.Setter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.text.MessageFormat;
@@ -29,6 +31,8 @@ import java.util.concurrent.TimeUnit;
  * @version 1.0
  */
 public class LocaleManager {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger( LocaleManager.class );
 
     // The ResourceManager to use for this LocaleManager
     private ResourceManager resourceManager;
@@ -103,7 +107,7 @@ public class LocaleManager {
             try {
                 load( new Locale( locale[0], locale[1] ), "file://" + file.getAbsolutePath() );
             } catch ( ResourceLoadFailedException e ) {
-                e.printStackTrace();
+                LOGGER.warn( "Could not load i18n file {}", file.getAbsolutePath(), e );
             }
         }
     }
@@ -126,10 +130,9 @@ public class LocaleManager {
      * @param locale Locale which should be read for
      * @param key    The key which should be looked up
      * @return The String stored in the ResourceLoader
-     * @throws ResourceNotLoadedException  If the Resource was not registered
      * @throws ResourceLoadFailedException If the Resource was cleared out and could not be reloaded into the Cache
      */
-    private String getTranslationString( Locale locale, String key ) throws ResourceNotLoadedException, ResourceLoadFailedException {
+    private String getTranslationString( Locale locale, String key ) throws ResourceLoadFailedException {
         return resourceManager.get( locale, key );
     }
 
@@ -174,10 +177,10 @@ public class LocaleManager {
         String translationString = null;
         try {
             translationString = getTranslationString( playerLocale, translationKey );
-        } catch ( ResourceNotLoadedException | ResourceLoadFailedException e ) {
+        } catch ( ResourceLoadFailedException e ) {
             try {
                 translationString = getTranslationString( playerLocale = defaultLocale, translationKey );
-            } catch ( ResourceNotLoadedException | ResourceLoadFailedException e1 ) {
+            } catch ( ResourceLoadFailedException e1 ) {
                 // Ignore .-.
             }
         }
@@ -207,12 +210,12 @@ public class LocaleManager {
         String translationString = null;
         try {
             translationString = getTranslationString( defaultLocale, translationKey );
-        } catch ( ResourceNotLoadedException | ResourceLoadFailedException e ) {
-            e.printStackTrace();
+        } catch ( ResourceLoadFailedException e ) {
+            // Ignore .-.
         }
 
         if ( translationString == null ) {
-            System.out.println( "The key(" + translationKey + ") is not present in the Locale " + defaultLocale.toString() );
+            LOGGER.warn( "The key({}) is not present in the Locale {}", translationKey, defaultLocale );
             return "N/A (" + translationKey + ")";
         }
 

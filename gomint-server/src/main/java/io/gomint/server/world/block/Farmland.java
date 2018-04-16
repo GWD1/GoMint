@@ -19,8 +19,6 @@ import java.util.function.Predicate;
 @RegisterInfo( id = 60 )
 public class Farmland extends Block implements io.gomint.world.block.BlockFarmland {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger( Farmland.class );
-
     @Override
     public int getBlockId() {
         return 60;
@@ -99,6 +97,11 @@ public class Farmland extends Block implements io.gomint.world.block.BlockFarmla
     @Override
     public BlockType getType() {
         return BlockType.FARMLAND;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

@@ -20,6 +20,7 @@ public class Concrete extends Block implements io.gomint.world.block.BlockConcre
     public long getBreakTime() {
         return 2700;
     }
+
     @Override
     public float getBlastResistance() {
         return 9.0f;
@@ -28,6 +29,11 @@ public class Concrete extends Block implements io.gomint.world.block.BlockConcre
     @Override
     public BlockType getType() {
         return BlockType.CONCRETE;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

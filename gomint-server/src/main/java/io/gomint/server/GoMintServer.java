@@ -8,8 +8,11 @@
 package io.gomint.server;
 
 import com.google.common.reflect.ClassPath;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.gomint.GoMint;
 import io.gomint.GoMintInstanceHolder;
+import io.gomint.config.InvalidConfigurationException;
 import io.gomint.entity.Entity;
 import io.gomint.entity.EntityPlayer;
 import io.gomint.gui.ButtonList;
@@ -17,13 +20,16 @@ import io.gomint.gui.CustomForm;
 import io.gomint.gui.Modal;
 import io.gomint.inventory.item.ItemStack;
 import io.gomint.permission.GroupManager;
+import io.gomint.player.PlayerSkin;
 import io.gomint.plugin.StartupPriority;
 import io.gomint.server.assets.AssetsLibrary;
 import io.gomint.server.config.ServerConfig;
 import io.gomint.server.config.WorldConfig;
 import io.gomint.server.crafting.Recipe;
 import io.gomint.server.crafting.RecipeManager;
+import io.gomint.server.enchant.Enchantments;
 import io.gomint.server.entity.Entities;
+import io.gomint.server.entity.potion.Effects;
 import io.gomint.server.inventory.CreativeInventory;
 import io.gomint.server.inventory.InventoryHolder;
 import io.gomint.server.inventory.item.Items;
@@ -34,9 +40,14 @@ import io.gomint.server.network.Protocol;
 import io.gomint.server.permission.PermissionGroupManager;
 import io.gomint.server.plugin.SimplePluginManager;
 import io.gomint.server.scheduler.SyncTaskManager;
+import io.gomint.server.util.Watchdog;
 import io.gomint.server.world.WorldAdapter;
+import io.gomint.server.world.WorldLoadException;
 import io.gomint.server.world.WorldManager;
+import io.gomint.server.world.block.Blocks;
 import io.gomint.world.World;
+import io.gomint.world.block.Block;
+import io.gomint.world.generator.CreateOptions;
 import joptsimple.OptionSet;
 import lombok.Getter;
 import org.jline.reader.*;
@@ -45,15 +56,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.SocketException;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.jar.Manifest;
 
 /**
  * @author BlackyPaw
@@ -63,7 +76,6 @@ import java.util.concurrent.locks.ReentrantLock;
 public class GoMintServer implements GoMint, InventoryHolder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( GoMintServer.class );
-    @Getter private static ClassPath classPath;
     private static long mainThread;
 
     // Configuration
@@ -82,6 +94,7 @@ public class GoMintServer implements GoMint, InventoryHolder {
     // World Management
     @Getter
     private WorldManager worldManager;
+    private String defaultWorld;
 
     // Game Information
     private RecipeManager recipeManager;
@@ -97,14 +110,30 @@ public class GoMintServer implements GoMint, InventoryHolder {
     private SyncTaskManager syncTaskManager;
     private AtomicBoolean running = new AtomicBoolean( true );
     @Getter
-    private ExecutorService executorService;
-    @Getter
-    private ThreadFactory threadFactory;
+    private ListeningExecutorService executorService;
     private Thread readerThread;
     private long currentTickTime;
 
     // Additional informations for API usage
     private double tps;
+
+    // Watchdog
+    @Getter
+    private Watchdog watchdog;
+
+    // Core utils
+    @Getter
+    private ClassPath classPath;
+    @Getter
+    private Blocks blocks;
+    @Getter
+    private Items items;
+    @Getter
+    private Enchantments enchantments;
+    @Getter
+    private Entities entities;
+    @Getter
+    private Effects effects;
 
     /**
      * Starts the GoMint server
@@ -114,21 +143,39 @@ public class GoMintServer implements GoMint, InventoryHolder {
     public GoMintServer( OptionSet args ) {
         long start = System.currentTimeMillis();
 
-        try {
-            GoMintServer.classPath = ClassPath.from( ClassLoader.getSystemClassLoader() );
-        } catch ( IOException e ) {
-            GoMintServer.classPath = null;
-            LOGGER.error( "Could no init classpath scanner: ", e );
-            return;
-        }
-
         GoMintServer.mainThread = Thread.currentThread().getId();
         GoMintInstanceHolder.setInstance( this );
+
+        // Extract informations from the manifest
+        String buildVersion = "dev/unsupported";
+        ClassLoader cl = getClass().getClassLoader();
+        try {
+            URL url = cl.getResource( "META-INF/MANIFEST.MF" );
+            if ( url != null ) {
+                Manifest manifest = new Manifest( url.openStream() );
+                buildVersion = manifest.getMainAttributes().getValue( "Implementation-Build" );
+            }
+
+            if ( buildVersion == null ) {
+                buildVersion = "dev/unsupported";
+            }
+        } catch ( IOException e ) {
+            // Ignored .-.
+        }
+
+        LOGGER.info( "Starting {} {}", getVersion(), buildVersion );
+        Thread.currentThread().setName( "GoMint Main Thread" );
+
+        try {
+            this.classPath = ClassPath.from( ClassLoader.getSystemClassLoader() );
+        } catch ( IOException e ) {
+            e.printStackTrace();
+        }
 
         // ------------------------------------ //
         // Executor Initialization
         // ------------------------------------ //
-        this.threadFactory = new ThreadFactory() {
+        ThreadFactory threadFactory = new ThreadFactory() {
             private AtomicLong counter = new AtomicLong( 0 );
 
             @Override
@@ -139,27 +186,34 @@ public class GoMintServer implements GoMint, InventoryHolder {
             }
         };
 
-        this.executorService = new ThreadPoolExecutor( 0, 512, 60L,
-            TimeUnit.SECONDS, new SynchronousQueue<>(), this.threadFactory );
+        this.executorService = MoreExecutors.listeningDecorator( new ThreadPoolExecutor( 0, 512, 60L,
+            TimeUnit.SECONDS, new SynchronousQueue<>(), threadFactory ) );
+
+        this.watchdog = new Watchdog( this );
+
+        // ------------------------------------ //
+        // Build up registries
+        // ------------------------------------ //
+        this.blocks = new Blocks( this );
+        this.items = new Items( this );
+        this.enchantments = new Enchantments( this );
+        this.entities = new Entities( this );
+        this.effects = new Effects( this );
 
         // ------------------------------------ //
         // jLine setup
         // ------------------------------------ //
         BlockingQueue<String> inputLines = new LinkedBlockingQueue<>();
-
         LineReader reader = null;
         Terminal terminal = TerminalConsoleAppender.getTerminal();
         if ( terminal != null ) {
             reader = LineReaderBuilder.builder()
                 .appName( "GoMint" )
                 .terminal( terminal )
-                .completer( new Completer() {
-                    @Override
-                    public void complete( LineReader lineReader, ParsedLine parsedLine, List<Candidate> list ) {
-                        List<String> suggestions = pluginManager.getCommandManager().completeSystem( parsedLine.line() );
-                        for ( String suggestion : suggestions ) {
-                            list.add( new Candidate( suggestion ) );
-                        }
+                .completer( ( lineReader, parsedLine, list ) -> {
+                    List<String> suggestions = pluginManager.getCommandManager().completeSystem( parsedLine.line() );
+                    for ( String suggestion : suggestions ) {
+                        list.add( new Candidate( suggestion ) );
                     }
                 } )
                 .build();
@@ -175,6 +229,7 @@ public class GoMintServer implements GoMint, InventoryHolder {
         if ( reader != null ) {
             LineReader finalReader = reader;
             AtomicBoolean reading = new AtomicBoolean( false );
+
             this.readerThread = new Thread( () -> {
                 String line;
                 while ( running.get() ) {
@@ -190,25 +245,28 @@ public class GoMintServer implements GoMint, InventoryHolder {
                     }
                 }
             } );
+
             this.readerThread.setName( "GoMint CLI reader" );
             this.readerThread.start();
 
-            // Wait until we read
             while ( !reading.get() ) {
+                try {
+                    Thread.sleep( 10 );
+                } catch ( InterruptedException e ) {
+                    // Ignored .-.
+                }
             }
         }
-
-        LOGGER.info( "Starting " + getVersion() );
-        Thread.currentThread().setName( "GoMint Main Thread" );
 
         // ------------------------------------ //
         // Configuration Initialization
         // ------------------------------------ //
         this.loadConfig();
+        this.defaultWorld = this.serverConfig.getDefaultWorld();
 
         // Calculate the nanoseconds we need for the tick loop
         long skipNanos = TimeUnit.SECONDS.toNanos( 1 ) / this.getServerConfig().getTargetTPS();
-        LOGGER.debug( "Setting skipNanos to: " + skipNanos );
+        LOGGER.debug( "Setting skipNanos to: {}", skipNanos );
 
         // ------------------------------------ //
         // Start of encryption helpers
@@ -216,9 +274,10 @@ public class GoMintServer implements GoMint, InventoryHolder {
         this.encryptionKeyFactory = new EncryptionKeyFactory( this );
 
         // ------------------------------------ //
-        // Scheduler + PluginManager Initialization
+        // Scheduler + WorldManager + PluginManager Initialization
         // ------------------------------------ //
         this.syncTaskManager = new SyncTaskManager( this, skipNanos );
+        this.worldManager = new WorldManager( this );
 
         this.pluginManager = new SimplePluginManager( this );
         this.pluginManager.detectPlugins();
@@ -229,7 +288,8 @@ public class GoMintServer implements GoMint, InventoryHolder {
         // ------------------------------------ //
         // Load assets from file:
         LOGGER.info( "Loading assets library..." );
-        AssetsLibrary assetsLibrary = new AssetsLibrary();
+        AssetsLibrary assetsLibrary = new AssetsLibrary( this );
+
         try {
             assetsLibrary.load( this.getClass().getResourceAsStream( "/assets.dat" ) );
         } catch ( IOException e ) {
@@ -238,25 +298,27 @@ public class GoMintServer implements GoMint, InventoryHolder {
         }
 
         LOGGER.info( "Initializing recipes..." );
-        this.recipeManager = new RecipeManager( this );
+        this.recipeManager = new RecipeManager();
 
         // Add all recipes from asset library:
         for ( Recipe recipe : assetsLibrary.getRecipes() ) {
             this.recipeManager.registerRecipe( recipe );
         }
 
-        this.creativeInventory = new CreativeInventory( this );
+        this.recipeManager.fixMCPEBugs();
+
+        this.creativeInventory = assetsLibrary.getCreativeInventory();
         this.permissionGroupManager = new PermissionGroupManager();
 
         // ------------------------------------ //
         // World Initialization
         // ------------------------------------ //
-        this.worldManager = new WorldManager( this );
         // CHECKSTYLE:OFF
         try {
             this.worldManager.loadWorld( this.serverConfig.getDefaultWorld() );
-        } catch ( Exception e ) {
+        } catch ( WorldLoadException e ) {
             LOGGER.error( "Failed to load default world", e );
+            return;
         }
         // CHECKSTYLE:ON
 
@@ -290,13 +352,15 @@ public class GoMintServer implements GoMint, InventoryHolder {
         while ( this.running.get() ) {
             tickLock.lock();
             try {
+                this.watchdog.add( 30, TimeUnit.SECONDS );
+
                 start = System.nanoTime();
 
                 // Tick all major subsystems:
                 this.currentTickTime = System.currentTimeMillis();
 
                 // Drain input lines
-                while ( inputLines.size() > 0 ) {
+                while ( !inputLines.isEmpty() ) {
                     String line = inputLines.take();
                     this.pluginManager.getCommandManager().executeSystem( line );
                 }
@@ -307,6 +371,8 @@ public class GoMintServer implements GoMint, InventoryHolder {
                 this.syncTaskManager.update( this.currentTickTime, lastTickTime );
                 this.worldManager.update( this.currentTickTime, lastTickTime );
                 this.permissionGroupManager.update( this.currentTickTime, lastTickTime );
+
+                this.watchdog.done();
 
                 // Check if we got shutdown
                 if ( !this.running.get() ) {
@@ -333,8 +399,8 @@ public class GoMintServer implements GoMint, InventoryHolder {
         LOGGER.info( "Starting shutdown..." );
 
         // Safe shutdown
-        this.networkManager.close();
         this.pluginManager.close();
+        this.networkManager.close();
         this.worldManager.close();
 
         int wait = 500;
@@ -381,6 +447,25 @@ public class GoMintServer implements GoMint, InventoryHolder {
         LOGGER.info( "Shutdown completed" );
 
         // Wait up to 5 seconds
+        if ( this.announceThreads() ) {
+            start = System.currentTimeMillis();
+            while ( ( System.currentTimeMillis() - start ) < TimeUnit.SECONDS.toMillis( 5 ) ) {
+                try {
+                    Thread.sleep( 50 );
+                } catch ( InterruptedException e ) {
+                    // Ignore
+                }
+            }
+
+            this.announceThreads();
+        }
+
+        System.exit( 0 );
+    }
+
+    private boolean announceThreads() {
+        boolean foundThread = false;
+
         Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
         for ( Thread thread : threadSet ) {
             if ( thread.isDaemon() || thread.getId() == mainThread || ( thread.getThreadGroup().getParent() == null &&
@@ -388,12 +473,16 @@ public class GoMintServer implements GoMint, InventoryHolder {
                 continue;
             }
 
-            LOGGER.warn( "Remaining thread after shutdown: " + thread.getName() + " (#" + thread.getId() + ")" );
-            LOGGER.warn( "Status: " + thread.getState().name() + " - Threadgroup: " + thread.getThreadGroup().getName() );
+            foundThread = true;
+
+            LOGGER.warn( "Remaining thread after shutdown: {} (#{})", thread.getName(), thread.getId() );
+            LOGGER.warn( "Status: {} - Threadgroup: {}", thread.getState(), thread.getThreadGroup().getName() );
             for ( StackTraceElement element : thread.getStackTrace() ) {
-                LOGGER.warn( "  " + element.toString() );
+                LOGGER.warn( "  {}", element );
             }
         }
+
+        return foundThread;
     }
 
     private boolean initNetworking( String host, int port ) {
@@ -423,8 +512,29 @@ public class GoMintServer implements GoMint, InventoryHolder {
         return true;
     }
 
+    @Override
     public WorldAdapter getDefaultWorld() {
-        return this.worldManager.getWorld( this.serverConfig.getDefaultWorld() );
+        return this.worldManager.getWorld( this.defaultWorld );
+    }
+
+    @Override
+    public void setDefaultWorld( World world ) {
+        if ( world == null ) {
+            LOGGER.warn( "Can't set default world to null" );
+            return;
+        }
+
+        this.defaultWorld = world.getWorldName();
+    }
+
+    @Override
+    public <T extends Block> T createBlock( Class<T> blockClass ) {
+        return (T) this.blocks.get( blockClass );
+    }
+
+    @Override
+    public World createWorld( String name, CreateOptions options ) {
+        return this.worldManager.createWorld( name, options );
     }
 
     public RecipeManager getRecipeManager() {
@@ -435,16 +545,10 @@ public class GoMintServer implements GoMint, InventoryHolder {
         this.serverConfig = new ServerConfig();
 
         try {
-            this.serverConfig.initialize( new File( "server.cfg" ) );
-        } catch ( IOException e ) {
+            this.serverConfig.init( new File( "server.yml" ) );
+        } catch ( InvalidConfigurationException e ) {
             LOGGER.error( "server.cfg is corrupted: ", e );
             System.exit( -1 );
-        }
-
-        try ( FileWriter fileWriter = new FileWriter( new File( "server.cfg" ) ) ) {
-            this.serverConfig.write( fileWriter );
-        } catch ( IOException e ) {
-            LOGGER.warn( "Could not save server.cfg: ", e );
         }
     }
 
@@ -467,7 +571,7 @@ public class GoMintServer implements GoMint, InventoryHolder {
             // CHECKSTYLE:OFF
             try {
                 return this.worldManager.loadWorld( name );
-            } catch ( Exception e ) {
+            } catch ( WorldLoadException e ) {
                 LOGGER.warn( "Failed to load world: " + name, e );
                 return null;
             }
@@ -479,12 +583,12 @@ public class GoMintServer implements GoMint, InventoryHolder {
 
     @Override
     public <T extends ItemStack> T createItemStack( Class<T> itemClass, int amount ) {
-        return Items.create( itemClass, (byte) amount );
+        return this.items.create( itemClass, (byte) amount );
     }
 
     @Override
     public <T extends Entity> T createEntity( Class<T> entityClass ) {
-        return Entities.create( entityClass );
+        return this.entities.create( entityClass );
     }
 
     /**
@@ -525,7 +629,7 @@ public class GoMintServer implements GoMint, InventoryHolder {
     public EntityPlayer findPlayerByName( String target ) {
         for ( WorldAdapter adapter : worldManager.getWorlds() ) {
             for ( EntityPlayer player : adapter.getPlayers() ) {
-                if ( player.getName().equals( target ) ) {
+                if ( player.getName().equalsIgnoreCase( target ) ) {
                     return player;
                 }
             }
@@ -560,13 +664,7 @@ public class GoMintServer implements GoMint, InventoryHolder {
      * @return amount of players online
      */
     public int getAmountOfPlayers() {
-        int amount = 0;
-
-        for ( WorldAdapter worldAdapter : worldManager.getWorlds() ) {
-            amount += worldAdapter.getAmountOfPlayers();
-        }
-
-        return amount;
+        return this.playersByUUID.size();
     }
 
     public CreativeInventory getCreativeInventory() {
@@ -576,6 +674,21 @@ public class GoMintServer implements GoMint, InventoryHolder {
     @Override
     public boolean isMainThread() {
         return GoMintServer.mainThread == Thread.currentThread().getId();
+    }
+
+    @Override
+    public PlayerSkin createPlayerSkin( InputStream inputStream ) {
+        try {
+            return io.gomint.server.player.PlayerSkin.fromInputStream( inputStream );
+        } catch ( IOException e ) {
+            LOGGER.error( "Could not read skin from input: ", e );
+            return null;
+        }
+    }
+
+    @Override
+    public PlayerSkin getEmptyPlayerSkin() {
+        return io.gomint.server.player.PlayerSkin.emptySkin();
     }
 
     public long getCurrentTickTime() {
@@ -612,6 +725,10 @@ public class GoMintServer implements GoMint, InventoryHolder {
         }
 
         return new WorldConfig();
+    }
+
+    public boolean isRunning() {
+        return this.running.get();
     }
 
 }

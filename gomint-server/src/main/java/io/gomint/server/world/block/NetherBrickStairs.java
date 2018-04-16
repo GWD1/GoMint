@@ -31,4 +31,9 @@ public class NetherBrickStairs extends Stairs {
         return BlockType.NETHER_BRICK_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -16,7 +16,7 @@
     <dependencies>
         <dependency>
             <groupId>io.gomint</groupId>
-            <artifactId>gomint-api</artifactId>
+            <artifactId>gomint-server</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

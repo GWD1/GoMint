@@ -36,4 +36,9 @@ public class NetherBrickFence extends Block implements io.gomint.world.block.Blo
         return BlockType.NETHER_BRICK_FENCE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

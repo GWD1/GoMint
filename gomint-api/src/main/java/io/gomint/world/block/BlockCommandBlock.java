@@ -12,4 +12,19 @@ package io.gomint.world.block;
  * @version 1.0
  */
 public interface BlockCommandBlock extends Block {
+
+    /**
+     * Set a custom name for this container
+     *
+     * @param customName which should be used
+     */
+    void setCustomName( String customName );
+
+    /**
+     * Get the custom name of this container
+     *
+     * @return custom name of this container
+     */
+    String getCustomName();
+
 }

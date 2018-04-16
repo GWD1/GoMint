@@ -24,6 +24,11 @@ public enum UpdateReason {
     /**
      * A neighbour block exploded
      */
-    EXPLOSION
+    EXPLOSION,
+
+    /**
+     * A block has been placed
+     */
+    BLOCK_ADDED
 
 }

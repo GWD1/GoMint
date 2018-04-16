@@ -43,4 +43,9 @@ public class Carpet extends Block implements io.gomint.world.block.BlockCarpet {
         return BlockType.CARPET;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

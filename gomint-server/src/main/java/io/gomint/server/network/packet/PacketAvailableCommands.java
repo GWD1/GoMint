@@ -29,7 +29,7 @@ public class PacketAvailableCommands extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
+    public void serialize( PacketBuffer buffer, int protocolID ) {
         // First we need to write all enum values
         buffer.writeUnsignedVarInt( this.enumValues.size() );
         for ( String enumValue : this.enumValues ) {
@@ -90,7 +90,7 @@ public class PacketAvailableCommands extends Packet {
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
 
     }
 

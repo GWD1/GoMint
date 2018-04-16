@@ -31,4 +31,9 @@ public class DarkOakWoodStairs extends Stairs {
         return BlockType.DARK_OAK_WOOD_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

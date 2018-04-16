@@ -10,6 +10,7 @@ import java.util.List;
 
 /**
  * @author geNAZt
+ * @version 1.0
  */
 public class ButtonList extends Form implements io.gomint.gui.ButtonList {
 

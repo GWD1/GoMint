@@ -26,4 +26,9 @@ public class GlowingObsidian extends Block implements io.gomint.world.block.Bloc
         return BlockType.GLOWING_OBSIDIAN;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

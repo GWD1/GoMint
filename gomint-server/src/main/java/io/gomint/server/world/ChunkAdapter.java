@@ -9,51 +9,62 @@ package io.gomint.server.world;
 
 import io.gomint.jraknet.PacketBuffer;
 import io.gomint.math.BlockPosition;
-import io.gomint.math.Location;
+import io.gomint.server.SelfInstrumentation;
 import io.gomint.server.async.Delegate2;
 import io.gomint.server.entity.Entity;
 import io.gomint.server.entity.EntityPlayer;
-import io.gomint.server.entity.tileentity.CommandBlockTileEntity;
 import io.gomint.server.entity.tileentity.TileEntities;
 import io.gomint.server.entity.tileentity.TileEntity;
 import io.gomint.server.network.packet.Packet;
 import io.gomint.server.network.packet.PacketWorldChunk;
-import io.gomint.server.util.collection.EntityIDMap;
 import io.gomint.server.world.postprocessor.PostProcessor;
 import io.gomint.server.world.storage.TemporaryStorage;
-import io.gomint.taglib.NBTReader;
 import io.gomint.taglib.NBTTagCompound;
 import io.gomint.taglib.NBTWriter;
 import io.gomint.world.Biome;
 import io.gomint.world.Chunk;
 import io.gomint.world.block.Block;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.nio.ByteOrder;
-import java.util.*;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * @author BlackyPaw
  * @version 1.0
  */
+@ToString( of = { "world", "x", "z" } )
 @RequiredArgsConstructor
-@EqualsAndHashCode( callSuper = false, of = { "x", "z" } )
+@EqualsAndHashCode( callSuper = false, of = { "world", "x", "z" } )
 public class ChunkAdapter implements Chunk {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( ChunkAdapter.class );
+    private static final AtomicLong LAST_WARNING = new AtomicLong( System.currentTimeMillis() );
 
     // CHECKSTYLE:OFF
     // World
-    @Getter protected final WorldAdapter world;
+    @Getter
+    protected final WorldAdapter world;
 
     // Networking
     boolean dirty;
@@ -79,7 +90,7 @@ public class ChunkAdapter implements Chunk {
     protected long lastSavedTimestamp;
 
     // Entities
-    protected EntityIDMap entities = EntityIDMap.withExpectedSize( 20 );
+    protected Long2ObjectMap<io.gomint.entity.Entity> entities = null;
 
     // Post loading processing
     protected Queue<PostProcessor> postProcessors = new LinkedList<>();
@@ -108,7 +119,7 @@ public class ChunkAdapter implements Chunk {
             int blockHash = this.world.randomUpdateNumber >> 2;
             for ( int i = 0; i < 3; ++i, blockHash >>= 10 ) {
                 short index = (short) ( blockHash & 0xfff );
-                byte blockId = chunkSlice.getBlockInternal( index );
+                int blockId = chunkSlice.getBlockInternal( index );
                 switch ( blockId ) {
                     case (byte) 244:    // Beetroot
                     case 2:             // Grass
@@ -119,10 +130,6 @@ public class ChunkAdapter implements Chunk {
                     case (byte) 161:    // Acacia leaves
                     case 78:            // Top snow
                     case 79:            // Ice
-                    case 11:            // Stationary lava
-                    case 10:            // FlowingLava
-                    case 9:             // Stationary water
-                    case 8:             // FlowingWater
                         int blockX = ( blockHash >> 8 ) & 0x0f;
                         int blockY = ( blockHash ) & 0x0f;
                         int blockZ = ( blockHash >> 4 ) & 0x0f;
@@ -133,14 +140,11 @@ public class ChunkAdapter implements Chunk {
                                 .update( UpdateReason.RANDOM, currentTimeMS, dT );
 
                             if ( next > currentTimeMS ) {
-                                Location location = block.getLocation();
-                                this.world.tickQueue.add( next,
-                                    CoordinateUtils.toLong( (int) location.getX(),
-                                        (int) location.getY(),
-                                        (int) location.getZ() )
-                                );
+                                this.world.addTickingBlock( next, block.getLocation().toBlockPosition() );
                             }
                         }
+
+                        break;
 
                     default:
                         break;
@@ -166,7 +170,12 @@ public class ChunkAdapter implements Chunk {
      */
     void addPlayer( EntityPlayer player ) {
         this.players.add( player );
-        this.entities.justPut( player.getEntityId(), player );
+
+        if ( this.entities == null ) {
+            this.entities = new Long2ObjectOpenHashMap<>();
+        }
+
+        this.entities.put( player.getEntityId(), player );
     }
 
     /**
@@ -177,7 +186,15 @@ public class ChunkAdapter implements Chunk {
     void removePlayer( EntityPlayer player ) {
         this.players.remove( player );
         this.lastPlayerOnThisChunk = System.currentTimeMillis();
-        this.entities.justRemove( player.getEntityId() );
+
+        if ( this.entities == null ) {
+            return;
+        }
+
+        this.entities.remove( player.getEntityId() );
+        if ( this.entities.size() == 0 ) {
+            this.entities = null;
+        }
     }
 
     /**
@@ -185,9 +202,12 @@ public class ChunkAdapter implements Chunk {
      *
      * @param entity The entity which should be added
      */
-    void addEntity( Entity entity ) {
-        LOGGER.debug( "Adding entity " + entity + " to chunk " + x + ", " + z );
-        this.entities.justPut( entity.getEntityId(), entity );
+    protected void addEntity( Entity entity ) {
+        if ( this.entities == null ) {
+            this.entities = new Long2ObjectOpenHashMap<>();
+        }
+
+        this.entities.put( entity.getEntityId(), entity );
     }
 
     /**
@@ -196,8 +216,14 @@ public class ChunkAdapter implements Chunk {
      * @param entity The entity which should be removed
      */
     void removeEntity( Entity entity ) {
-        LOGGER.debug( "Removing entity " + entity + " from chunk " + x + ", " + z );
-        this.entities.justRemove( entity.getEntityId() );
+        if ( this.entities == null ) {
+            return;
+        }
+
+        this.entities.remove( entity.getEntityId() );
+        if ( this.entities.size() == 0 ) {
+            this.entities = null;
+        }
     }
 
     /**
@@ -216,7 +242,7 @@ public class ChunkAdapter implements Chunk {
      *
      * @return The timestamp this chunk was last written out at
      */
-    long getLastSavedTimestamp() {
+    public long getLastSavedTimestamp() {
         return this.lastSavedTimestamp;
     }
 
@@ -300,20 +326,14 @@ public class ChunkAdapter implements Chunk {
      *
      * @param tileEntity The NBT tag of the tile entity which should be added
      */
-    protected void addTileEntity( NBTTagCompound tileEntity ) {
-        int x = tileEntity.getInteger( "x", 0 ) & 0xF;
-        int y = tileEntity.getInteger( "y", -1 );
-        int z = tileEntity.getInteger( "z", 0 ) & 0xF;
+    protected void addTileEntity( TileEntity tileEntity ) {
+        BlockPosition tileEntityLocation = tileEntity.getLocation().toBlockPosition();
+        int xPos = tileEntityLocation.getX() & 0xF;
+        int yPos = tileEntityLocation.getY();
+        int zPos = tileEntityLocation.getZ() & 0xF;
 
-        TileEntity tileEntity1 = TileEntities.construct( tileEntity, this.world );
-        if ( tileEntity1 != null ) {
-            if ( tileEntity1 instanceof CommandBlockTileEntity ) {
-                LOGGER.debug( "Custom name: " + ( (CommandBlockTileEntity) tileEntity1 ).getCustomName() );
-            }
-
-            ChunkSlice slice = ensureSlice( y >> 4 );
-            slice.addTileEntity( x, y - slice.getSectionY() * 16, z, tileEntity1 );
-        }
+        ChunkSlice slice = ensureSlice( yPos >> 4 );
+        slice.addTileEntity( xPos, yPos - slice.getSectionY() * 16, zPos, tileEntity );
     }
 
     /**
@@ -325,8 +345,9 @@ public class ChunkAdapter implements Chunk {
      * @param id The ID to set the block to
      */
     public void setBlock( int x, int y, int z, int id ) {
-        ChunkSlice slice = ensureSlice( y >> 4 );
-        slice.setBlock( x, y - 16 * ( y >> 4 ), z, (byte) id );
+        int ySection = y >> 4;
+        ChunkSlice slice = ensureSlice( ySection );
+        slice.setBlock( x, y - 16 * ySection, z, id );
         this.dirty = true;
     }
 
@@ -338,7 +359,7 @@ public class ChunkAdapter implements Chunk {
      * @param z The z-coordinate of the block
      * @return The ID of the block
      */
-    public byte getBlock( int x, int y, int z ) {
+    public int getBlock( int x, int y, int z ) {
         ChunkSlice slice = ensureSlice( y >> 4 );
         return slice.getBlock( x, y - 16 * ( y >> 4 ), z );
     }
@@ -437,11 +458,17 @@ public class ChunkAdapter implements Chunk {
 
     /**
      * Recalculates the height map of the chunk.
+     *
+     * @param maxHeight max height of this chunk. Used to reduce load on the CPU
      */
-    public void calculateHeightmap() {
+    public void calculateHeightmap( int maxHeight ) {
+        if ( maxHeight == 0 ) {
+            return;
+        }
+
         for ( int i = 0; i < 16; ++i ) {
             for ( int k = 0; k < 16; ++k ) {
-                for ( int j = 255; j > 0; --j ) {
+                for ( int j = ( maxHeight + 16 ) - 1; j > 0; --j ) {
                     if ( this.getBlock( i, j, k ) != 0 ) {
                         this.setHeight( i, k, (byte) j );
                         break;
@@ -473,7 +500,7 @@ public class ChunkAdapter implements Chunk {
 
         buffer.writeByte( (byte) topEmpty );
         for ( int i = 0; i < topEmpty; i++ ) {
-            buffer.writeByte( (byte) 0 );
+            buffer.writeByte( (byte) 1 ); // TODO: Move to 1 once we have new palette
             buffer.writeBytes( ensureSlice( i ).getBytes() );
         }
 
@@ -484,7 +511,7 @@ public class ChunkAdapter implements Chunk {
 
         // Write tile entity data
         Collection<TileEntity> tileEntities = this.getTileEntities();
-        if ( tileEntities.size() > 0 ) {
+        if ( !tileEntities.isEmpty() ) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             NBTWriter nbtWriter = new NBTWriter( baos, ByteOrder.LITTLE_ENDIAN );
             nbtWriter.setUseVarint( true );
@@ -534,12 +561,54 @@ public class ChunkAdapter implements Chunk {
      * @return true if the chunk contains that entity, false if not
      */
     public boolean knowsEntity( Entity entity ) {
+        if ( this.entities == null ) {
+            return false;
+        }
+
         return this.entities.containsKey( entity.getEntityId() );
     }
 
     @Override
-    public Collection<io.gomint.entity.Entity> getEntities() {
-        return this.entities.size() == 0 ? null : this.entities.values();
+    public <T extends io.gomint.entity.Entity> void iterateEntities( Class<T> entityClass, Consumer<T> entityConsumer ) {
+        // Iterate over all chunks
+        if ( this.entities != null ) {
+            for ( Long2ObjectMap.Entry<io.gomint.entity.Entity> entry : this.entities.long2ObjectEntrySet() ) {
+                if ( entityClass.isAssignableFrom( entry.getValue().getClass() ) ) {
+                    entityConsumer.accept( (T) entry.getValue() );
+                }
+            }
+        }
+    }
+
+    @Override
+    public void setBlock( int x, int y, int z, Block block ) {
+        io.gomint.server.world.block.Block implBlock = (io.gomint.server.world.block.Block) block;
+
+        // Copy block id
+        this.setBlock( x, y, z, implBlock.getBlockId() );
+
+        // Copy metadata
+        this.setData( x, y, z, implBlock.getBlockData() );
+
+        // Copy NBT
+        if ( implBlock.getTileEntity() != null ) {
+            // Get compound
+            NBTTagCompound compound = new NBTTagCompound( "" );
+            implBlock.getTileEntity().toCompound( compound );
+
+            // Change position
+            int fullX = CoordinateUtils.getChunkMin( this.x ) + x;
+            int fullZ = CoordinateUtils.getChunkMin( this.z ) + z;
+
+            // Change the position
+            compound.addValue( "x", fullX );
+            compound.addValue( "y", y );
+            compound.addValue( "z", fullZ );
+
+            // Create new tile entity
+            TileEntity tileEntity = TileEntities.construct( compound, this.world );
+            this.setTileEntity( x, y, z, tileEntity );
+        }
     }
 
     public PacketWorldChunk getCachedPacket() {
@@ -549,7 +618,25 @@ public class ChunkAdapter implements Chunk {
             this.dirty = false;
         }
 
-        return this.cachedPacket.get();
+        // Check if we have a object
+        PacketWorldChunk packetWorldChunk = this.cachedPacket.get();
+        if ( packetWorldChunk == null ) {
+            // The packet got cleared from the JVM due to memory limits
+            if ( this.world.getServer().getCurrentTickTime() - LAST_WARNING.get() >= 5000 ) {
+                NumberFormat numberFormat = NumberFormat.getNumberInstance();
+                numberFormat.setMaximumFractionDigits( 2 );
+
+                LOGGER.warn( "We need to create new chunk data for the network. This only happens when the JVM runs low on " +
+                        "memory. Please consider raising -Xmx in your start parameters. Current free: {} MB",
+                    numberFormat.format( ( Runtime.getRuntime().freeMemory() / (double) 1024 ) / (double) 1024 ) );
+
+                LAST_WARNING.set( this.world.getServer().getCurrentTickTime() );
+            }
+
+            return createPackagedData();
+        }
+
+        return packetWorldChunk;
     }
 
     public void setTileEntity( int x, int y, int z, TileEntity tileEntity ) {
@@ -562,6 +649,27 @@ public class ChunkAdapter implements Chunk {
         while ( !this.postProcessors.isEmpty() ) {
             this.postProcessors.poll().process();
         }
+    }
+
+    public long longHashCode() {
+        return CoordinateUtils.toLong( this.x, this.z );
+    }
+
+    public Long2ObjectMap<io.gomint.entity.Entity> getEntities() {
+        return this.entities;
+    }
+
+    public long getMemorySize() {
+        long size = SelfInstrumentation.getObjectSize( this.chunkSlices );
+
+        for ( ChunkSlice slice : this.chunkSlices ) {
+            if ( slice != null ) {
+                size += SelfInstrumentation.getObjectSize( slice );
+                size += slice.getMemorySize();
+            }
+        }
+
+        return size;
     }
 
 }

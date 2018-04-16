@@ -7,10 +7,11 @@
 
 package io.gomint.server.permission;
 
-import com.koloboke.collect.map.ObjObjCursor;
 import io.gomint.permission.Group;
 import io.gomint.server.entity.EntityPlayer;
-import io.gomint.server.util.collection.PermissionMap;
+import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
@@ -26,11 +27,11 @@ public class PermissionManager implements io.gomint.permission.PermissionManager
 
     private final EntityPlayer player;
     private final List<PermissionGroup> groups = new ArrayList<>();
-    private final PermissionMap permissions = PermissionMap.withExpectedSize( 10 );
+    private final Object2BooleanMap<String> permissions = new Object2BooleanOpenHashMap<>();
     private boolean dirty = false;
 
     // Effective cache
-    private PermissionMap cache = PermissionMap.withExpectedSize( 50 );
+    private Object2BooleanMap<String> cache = new Object2BooleanOpenHashMap<>();
 
     /**
      * Update this permission manager
@@ -63,15 +64,13 @@ public class PermissionManager implements io.gomint.permission.PermissionManager
         Boolean val = this.cache.get( permissionIntern );
         if ( val == null ) {
             // Check player permissions first
-            ObjObjCursor<String, Boolean> playerCursor = this.permissions.cursor();
             String wildCardFound = null;
-
-            while ( playerCursor.moveNext() ) {
+            for ( Object2BooleanMap.Entry<String> entry : this.permissions.object2BooleanEntrySet() ) {
                 // Did we find a full permission match?
-                String currentChecking = playerCursor.key();
+                String currentChecking = entry.getKey();
                 if ( permissionIntern == currentChecking ) {
-                    this.cache.justPut( permissionIntern, playerCursor.value() );
-                    return playerCursor.value();
+                    this.cache.put( permissionIntern, entry.getBooleanValue() );
+                    return entry.getBooleanValue();
                 }
 
                 // Check for wildcard
@@ -87,8 +86,8 @@ public class PermissionManager implements io.gomint.permission.PermissionManager
 
             // Check if we found a wildcard
             if ( wildCardFound != null ) {
-                val = this.permissions.get( wildCardFound );
-                this.cache.justPut( permissionIntern, val );
+                val = this.permissions.getBoolean( wildCardFound );
+                this.cache.put( permissionIntern, val );
                 return val;
             }
 
@@ -98,16 +97,16 @@ public class PermissionManager implements io.gomint.permission.PermissionManager
 
             // Iterate over all groups until we found one we can use
             for ( PermissionGroup group : reverted ) {
-                playerCursor = group.cursor();
+                ObjectSet<Object2BooleanMap.Entry<String>> playerCursor = group.cursor();
                 wildCardFound = null;
 
                 if ( playerCursor != null ) {
-                    while ( playerCursor.moveNext() ) {
+                    for ( Object2BooleanMap.Entry<String> entry : playerCursor ) {
                         // Did we find a full permission match?
-                        String currentChecking = playerCursor.key();
+                        String currentChecking = entry.getKey();
                         if ( permissionIntern == currentChecking ) {
-                            this.cache.justPut( permissionIntern, playerCursor.value() );
-                            return playerCursor.value();
+                            this.cache.put( permissionIntern, entry.getBooleanValue() );
+                            return entry.getBooleanValue();
                         }
 
                         // Check for wildcard
@@ -124,12 +123,12 @@ public class PermissionManager implements io.gomint.permission.PermissionManager
 
                 if ( wildCardFound != null ) {
                     val = group.get( wildCardFound );
-                    this.cache.justPut( permissionIntern, val );
+                    this.cache.put( permissionIntern, val );
                     return val;
                 }
             }
 
-            this.cache.justPut( permissionIntern, false );
+            this.cache.put( permissionIntern, false );
             return false;
         }
 
@@ -152,14 +151,14 @@ public class PermissionManager implements io.gomint.permission.PermissionManager
 
     @Override
     public void setPermission( String permission, boolean value ) {
-        this.permissions.justPut( permission.intern(), value );
+        this.permissions.put( permission.intern(), value );
         this.cache.clear();
         this.dirty = true;
     }
 
     @Override
     public void removePermission( String permission ) {
-        this.permissions.justRemove( permission );
+        this.permissions.removeBoolean( permission );
         this.cache.clear();
         this.dirty = true;
     }

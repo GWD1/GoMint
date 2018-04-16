@@ -36,4 +36,9 @@ public class Bedrock extends Block implements io.gomint.world.block.BlockBedrock
         return BlockType.BEDROCK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return false;
+    }
+
 }

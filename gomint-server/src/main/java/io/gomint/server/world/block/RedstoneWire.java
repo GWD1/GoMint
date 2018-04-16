@@ -31,4 +31,9 @@ public class RedstoneWire extends Block implements io.gomint.world.block.BlockRe
         return BlockType.REDSTONE_WIRE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

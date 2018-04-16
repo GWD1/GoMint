@@ -31,4 +31,9 @@ public class PurpurBlock extends Block implements io.gomint.world.block.BlockPur
         return BlockType.PURPUR_BLOCK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

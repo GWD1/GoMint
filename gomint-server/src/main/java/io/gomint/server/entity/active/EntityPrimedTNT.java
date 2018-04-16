@@ -39,14 +39,11 @@ public class EntityPrimedTNT extends Entity implements io.gomint.entity.active.E
      */
     public EntityPrimedTNT( WorldAdapter world, Vector position, int ticksUntilExplosion ) {
         super( EntityType.PRIMED_TNT, world );
-        this.setSize( 0.98f, 0.98f );
-        this.setHasCollision( false );
 
         this.fuse = ticksUntilExplosion;
-        this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.IGNITED, true );
-        this.metadataContainer.putInt( MetadataContainer.DATA_FUSE_LENGTH, this.fuse );
+        this.initEntity();
 
-        this.world.playLevelEvent( position, LevelEvent.SOUND_IGNITE, 0 );
+        this.world.sendLevelEvent( position, LevelEvent.SOUND_IGNITE, 0 );
         this.setPosition( position );
     }
 
@@ -56,12 +53,18 @@ public class EntityPrimedTNT extends Entity implements io.gomint.entity.active.E
     public EntityPrimedTNT() {
         super( EntityType.PRIMED_TNT, null );
 
+        this.fuse = 80;
+        this.initEntity();
+    }
+
+    private void initEntity() {
         this.setSize( 0.98f, 0.98f );
         this.setHasCollision( false );
 
-        this.fuse = 80;
         this.metadataContainer.setDataFlag( MetadataContainer.DATA_INDEX, EntityFlag.IGNITED, true );
         this.metadataContainer.putInt( MetadataContainer.DATA_FUSE_LENGTH, this.fuse );
+
+        this.offsetY = 0.49f;
     }
 
     @Override
@@ -120,6 +123,6 @@ public class EntityPrimedTNT extends Entity implements io.gomint.entity.active.E
     public void spawn( Location location ) {
         super.spawn( location );
 
-        this.world.playLevelEvent( location, LevelEvent.SOUND_IGNITE, 0 );
+        this.world.sendLevelEvent( location, LevelEvent.SOUND_IGNITE, 0 );
     }
 }

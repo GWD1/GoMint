@@ -15,4 +15,14 @@ public class WorldLoadException extends Exception {
         super( message );
     }
 
+    /**
+     * Create a new world load exception with a reason
+     *
+     * @param message which should be printed as the reason
+     * @param caused  which has been thrown and swallowed into this exception
+     */
+    public WorldLoadException( String message, Exception caused ) {
+        super( message, caused );
+    }
+
 }

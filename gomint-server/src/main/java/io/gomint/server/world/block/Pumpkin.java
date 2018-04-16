@@ -36,4 +36,9 @@ public class Pumpkin extends Block implements io.gomint.world.block.BlockPumpkin
         return BlockType.PUMPKIN;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

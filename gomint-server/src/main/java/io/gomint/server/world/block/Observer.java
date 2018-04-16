@@ -48,4 +48,9 @@ public class Observer extends Block implements io.gomint.world.block.BlockObserv
         return BlockType.OBSERVER;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

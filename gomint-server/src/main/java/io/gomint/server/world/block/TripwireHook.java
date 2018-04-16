@@ -36,4 +36,9 @@ public class TripwireHook extends Block implements io.gomint.world.block.BlockTr
         return BlockType.TRIPWIRE_HOOK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

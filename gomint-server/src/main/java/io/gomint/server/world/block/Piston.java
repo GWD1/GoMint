@@ -38,17 +38,7 @@ public class Piston extends Block implements io.gomint.world.block.BlockPiston {
 
     @Override
     TileEntity createTileEntity( NBTTagCompound compound ) {
-        if ( compound == null ) {
-            compound = new NBTTagCompound( "" );
-        }
-
-        BlockPosition position = this.location.toBlockPosition();
-
-        // Add generic tile entity stuff
-        compound.addValue( "x", position.getX() );
-        compound.addValue( "y", position.getY() );
-        compound.addValue( "z", position.getZ() );
-
+        super.createTileEntity( compound );
         return new PistonArmTileEntity( compound, this.world );
     }
 
@@ -60,6 +50,11 @@ public class Piston extends Block implements io.gomint.world.block.BlockPiston {
     @Override
     public BlockType getType() {
         return BlockType.PISTON;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

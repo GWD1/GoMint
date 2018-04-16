@@ -36,4 +36,9 @@ public class DragonEgg extends Block implements io.gomint.world.block.BlockDrago
         return BlockType.DRAGON_EGG;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

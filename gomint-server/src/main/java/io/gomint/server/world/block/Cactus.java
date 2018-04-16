@@ -1,10 +1,10 @@
 package io.gomint.server.world.block;
 
-import io.gomint.world.block.BlockType;
-
 import io.gomint.event.entity.EntityDamageEvent;
+import io.gomint.server.entity.Entity;
 import io.gomint.server.entity.EntityLiving;
 import io.gomint.server.registry.RegisterInfo;
+import io.gomint.world.block.BlockType;
 
 /**
  * @author geNAZt
@@ -29,9 +29,10 @@ public class Cactus extends Block implements io.gomint.world.block.BlockCactus {
     }
 
     @Override
-    public void onEntityCollision( EntityLiving entity ) {
-        EntityDamageEvent damageEvent = new EntityDamageEvent( entity, EntityDamageEvent.DamageSource.CACTUS, 1.0f );
-        entity.damage( damageEvent );
+    public void onEntityCollision( Entity entity ) {
+        if ( entity instanceof EntityLiving ) {
+            ( (EntityLiving) entity ).attack( 1.0f, EntityDamageEvent.DamageSource.CACTUS );
+        }
     }
 
     @Override
@@ -42,6 +43,11 @@ public class Cactus extends Block implements io.gomint.world.block.BlockCactus {
     @Override
     public BlockType getType() {
         return BlockType.CACTUS;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

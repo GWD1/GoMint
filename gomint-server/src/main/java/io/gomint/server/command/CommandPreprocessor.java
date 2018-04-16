@@ -94,10 +94,10 @@ public class CommandPreprocessor {
                         for ( Map.Entry<String, ParamValidator> entry : overload.getParameters().entrySet() ) {
                             if ( entry.getValue().hasValues() ) {
                                 for ( String s : entry.getValue().values() ) {
-                                    this.addEnum( entry.getKey(), s );
+                                    this.addEnum( command.getName() + "#" + entry.getKey(), s );
                                 }
 
-                                this.enumIndexes.put( command.getName() + "#" + entry.getKey(), this.enums.getIndex( entry.getKey() ) );
+                                this.enumIndexes.put( command.getName() + "#" + entry.getKey(), this.enums.getIndex( command.getName() + "#" + entry.getKey() ) );
                             }
                         }
                     }
@@ -202,7 +202,7 @@ public class CommandPreprocessor {
 
         // Create / add this value to the enum
         List<Integer> old = this.enums.get( name );
-        if ( old == null ) {
+        if ( old == null ) {    // DONT use computeIfAbsent, the index won't show up
             old = new ArrayList<>();
             this.enums.put( name, old );
         }

@@ -12,6 +12,7 @@ import io.gomint.event.EventHandler;
 import io.gomint.event.EventListener;
 import javassist.*;
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @version 1.0
  */
 @EqualsAndHashCode( callSuper = false )
+@ToString( of = { "instance" } )
 class EventHandlerMethod implements Comparable<EventHandlerMethod> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( EventHandlerMethod.class );
@@ -33,6 +35,9 @@ class EventHandlerMethod implements Comparable<EventHandlerMethod> {
 
     private final EventHandler annotation;
     private EventProxy proxy;
+
+    // For toString reference
+    private final EventListener instance;
 
     /**
      * Construct a new data holder for a EventHandler.
@@ -43,12 +48,14 @@ class EventHandlerMethod implements Comparable<EventHandlerMethod> {
      */
     EventHandlerMethod( final EventListener instance, final Method method, final EventHandler annotation ) {
         this.annotation = annotation;
+        this.instance = instance;
 
         // Build up proxy
         try {
             // Prepare class pool for this plugin
             ClassPool pool = new ClassPool( ClassPool.getDefault() );
             pool.appendClassPath( new LoaderClassPath( instance.getClass().getClassLoader() ) );
+            pool.appendClassPath( new LoaderClassPath( method.getParameterTypes()[0].getClassLoader() ) );
 
             CtClass ctClass = pool.makeClass( "io.gomint.server.event.Proxy" + PROXY_COUNT.incrementAndGet() );
             ctClass.addInterface( pool.get( "io.gomint.server.event.EventProxy" ) );

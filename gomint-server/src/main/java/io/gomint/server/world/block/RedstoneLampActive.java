@@ -36,4 +36,9 @@ public class RedstoneLampActive extends Block implements io.gomint.world.block.B
         return BlockType.REDSTONE_LAMP_ACTIVE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

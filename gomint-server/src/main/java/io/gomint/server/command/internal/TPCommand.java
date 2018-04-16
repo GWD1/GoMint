@@ -28,10 +28,18 @@ import java.util.Map;
     @Parameter( name = "position", validator = BlockPositionValidator.class )
 } )
 @Overload( {
-    @Parameter( name = "target", validator = TargetValidator.class )
+    @Parameter( name = "toTarget", validator = TargetValidator.class )
 } )
 @Overload( {
     @Parameter( name = "position", validator = BlockPositionValidator.class )
+} )
+@Overload( {
+    @Parameter( name = "target", validator = TargetValidator.class ),
+    @Parameter( name = "position", validator = BlockPositionValidator.class, optional = true )
+} )
+@Overload( {
+    @Parameter( name = "target", validator = TargetValidator.class ),
+    @Parameter( name = "toTarget", validator = TargetValidator.class )
 } )
 public class TPCommand extends Command {
 
@@ -39,11 +47,17 @@ public class TPCommand extends Command {
     public CommandOutput execute( EntityPlayer player, String alias, Map<String, Object> arguments ) {
         CommandOutput output = new CommandOutput();
 
-        // Check for entity teleportation
+        // Check for source
+        EntityPlayer source = player;
         if ( arguments.containsKey( "target" ) ) {
-            EntityPlayer entity = (EntityPlayer) arguments.get( "target" );
-            player.teleport( entity.getLocation() );
-            output.success( "You have been teleported to %%s", entity.getName() );
+            source = (EntityPlayer) arguments.get( "target" );
+        }
+
+        // Check for entity teleportation
+        if ( arguments.containsKey( "toTarget" ) ) {
+            EntityPlayer entity = (EntityPlayer) arguments.get( "toTarget" );
+            source.teleport( entity.getLocation() );
+            output.success( "%%s has been teleported to %%s", source.getName(), entity.getName() );
             return output;
         }
 
@@ -64,8 +78,8 @@ public class TPCommand extends Command {
         to.setY( position.getY() );
         to.setZ( position.getZ() );
 
-        player.teleport( to );
-        output.success( "You have been teleported to %%s, %%s, %%s, %%s", to.getWorld().getWorldName(), to.getX(), to.getY(), to.getZ() );
+        source.teleport( to );
+        output.success( "%%s has been teleported to %%s, %%s, %%s, %%s", source.getName(), to.getWorld().getWorldName(), to.getX(), to.getY(), to.getZ() );
         return output;
     }
 

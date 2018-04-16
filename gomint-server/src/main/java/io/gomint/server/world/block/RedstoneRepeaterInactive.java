@@ -31,4 +31,9 @@ public class RedstoneRepeaterInactive extends Block implements io.gomint.world.b
         return BlockType.REDSTONE_REPEATER_INACTIVE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -10,6 +10,7 @@ import io.gomint.server.entity.projectile.EntityFishingHook;
 import io.gomint.server.registry.RegisterInfo;
 import io.gomint.taglib.NBTTagCompound;
 import io.gomint.world.block.Block;
+import io.gomint.world.block.BlockFace;
 
 /**
  * @author geNAZt
@@ -49,7 +50,7 @@ public class ItemFishingRod extends ItemStack implements io.gomint.inventory.ite
     }
 
     @Override
-    public boolean interact( EntityPlayer entity, int face, Vector clickPosition, Block clickedBlock ) {
+    public boolean interact( EntityPlayer entity, BlockFace face, Vector clickPosition, Block clickedBlock ) {
         if ( entity.getFishingHook() == null ) {
             EntityFishingHook hook = new EntityFishingHook( entity, entity.getWorld() );
             ProjectileLaunchEvent event = new ProjectileLaunchEvent( hook, ProjectileLaunchEvent.Cause.FISHING_ROD );

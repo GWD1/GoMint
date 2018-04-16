@@ -6,6 +6,7 @@ import java.util.List;
 
 /**
  * @author geNAZt
+ * @version 1.0
  */
 public class IndexedHashMap<K, V> extends LinkedHashMap<K, V> {
 

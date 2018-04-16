@@ -36,4 +36,9 @@ public class JackOLantern extends Block implements io.gomint.world.block.BlockJa
         return BlockType.JACK_O_LANTERN;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

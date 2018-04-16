@@ -31,4 +31,9 @@ public class QuartzStairs extends Stairs {
         return BlockType.QUARTZ_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

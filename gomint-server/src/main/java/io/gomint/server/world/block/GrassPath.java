@@ -36,4 +36,9 @@ public class GrassPath extends Block implements io.gomint.world.block.BlockGrass
         return BlockType.GRASS_PATH;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -1,6 +1,9 @@
 package io.gomint.server.inventory;
 
-import io.gomint.server.util.collection.StringIDToNumericMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 
 /**
  * @author geNAZt
@@ -8,13 +11,14 @@ import io.gomint.server.util.collection.StringIDToNumericMap;
  */
 public class MaterialMagicNumbers {
 
-    private static final StringIDToNumericMap NEW_ID_MAPPING = StringIDToNumericMap.withExpectedSize(500);
+    private static final Object2IntMap<String> NEW_ID_MAPPING = new Object2IntOpenHashMap<>();
+    private static final Int2ObjectMap<String> OLD_ID_MAPPING = new Int2ObjectOpenHashMap<>();
 
     static {
         // CHECKSTYLE:OFF
         register( 0, "minecraft:air" );
         register( 1, "minecraft:stone" );
-        register( 2, "minecraft:grass_block" );
+        register( 2, "minecraft:grass" );
         register( 3, "minecraft:dirt" );
         register( 4, "minecraft:cobblestone" );
         register( 5, "minecraft:wood_planks" );
@@ -385,11 +389,16 @@ public class MaterialMagicNumbers {
     }
 
     public static void register( int id, String newId ) {
-        NEW_ID_MAPPING.justPut( newId, id );
+        NEW_ID_MAPPING.put( newId, id );
+        OLD_ID_MAPPING.put( id, newId );
     }
 
     public static int valueOfWithId( String newId ) {
         return NEW_ID_MAPPING.getOrDefault( newId, 0 );
+    }
+
+    public static String newIdFromValue( int id ) {
+        return OLD_ID_MAPPING.getOrDefault( id, "minecraft:air" );
     }
 
 }

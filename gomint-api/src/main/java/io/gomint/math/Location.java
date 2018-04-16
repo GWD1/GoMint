@@ -8,6 +8,7 @@
 package io.gomint.math;
 
 import io.gomint.world.World;
+import io.gomint.world.block.Block;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -141,4 +142,7 @@ public class Location extends Vector implements Cloneable {
         return new Vector( this.x, this.y, this.z );
     }
 
+    public <T extends Block> T getBlock() {
+        return this.world.getBlockAt( MathUtils.fastFloor( this.x ), MathUtils.fastFloor( this.y ), MathUtils.fastFloor( this.z ) );
+    }
 }

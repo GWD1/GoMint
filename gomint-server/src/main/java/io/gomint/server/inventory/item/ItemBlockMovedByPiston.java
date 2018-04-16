@@ -10,7 +10,7 @@ import io.gomint.taglib.NBTTagCompound;
  * @version 1.0
  */
 @RegisterInfo( id = 250 )
- public class ItemBlockMovedByPiston extends ItemStack implements io.gomint.inventory.item.ItemBlockMovedByPiston {
+ public class ItemBlockMovedByPiston extends ItemStack {
 
     // CHECKSTYLE:OFF
     public ItemBlockMovedByPiston( short data, int amount ) {

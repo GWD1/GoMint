@@ -1,16 +1,22 @@
 package io.gomint.server.network.handler;
 
 import io.gomint.event.player.PlayerInteractEvent;
+import io.gomint.event.player.PlayerToggleGlideEvent;
+import io.gomint.event.player.PlayerToggleSneakEvent;
+import io.gomint.event.player.PlayerToggleSprintEvent;
 import io.gomint.event.world.BlockBreakEvent;
+import io.gomint.server.enchant.EnchantmentProcessor;
 import io.gomint.server.network.PlayerConnection;
 import io.gomint.server.network.packet.PacketPlayerAction;
+import io.gomint.server.world.BlockRuntimeIDs;
 import io.gomint.server.world.LevelEvent;
 import io.gomint.server.world.block.Air;
 import io.gomint.server.world.block.Block;
 import io.gomint.server.world.block.Fire;
-import io.gomint.world.Gamemode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
 
 /**
  * @author geNAZt
@@ -23,6 +29,15 @@ public class PacketPlayerActionHandler implements PacketHandler<PacketPlayerActi
     @Override
     public void handle( PacketPlayerAction packet, long currentTimeMillis, PlayerConnection connection ) {
         switch ( packet.getAction() ) {
+            case STOP_SWIMMING:
+                // Apart from this being spammed we currently don't allow swimming
+                break;
+
+            case SET_ENCHANT_SEED:
+                // Just ignore the seed, it just announces that we enchanted
+                connection.getEntity().setEnchantmentProcessor( new EnchantmentProcessor( connection.getEntity() ) );
+                break;
+
             case START_BREAK:
                 // Sanity checks (against crashes)
                 if ( connection.getEntity().canInteract( packet.getPosition().toVector().add( .5f, .5f, .5f ), 13 ) ) {
@@ -30,29 +45,27 @@ public class PacketPlayerActionHandler implements PacketHandler<PacketPlayerActi
                         .getPluginManager().callEvent( new PlayerInteractEvent( connection.getEntity(),
                             PlayerInteractEvent.ClickType.LEFT, connection.getEntity().getWorld().getBlockAt( packet.getPosition() ) ) );
 
-                    if ( !event.isCancelled() ) {
-                        if ( connection.getEntity().getStartBreak() == 0 ) {
-                            connection.getEntity().setBreakVector( packet.getPosition() );
-                            connection.getEntity().setStartBreak( currentTimeMillis );
+                    if ( !event.isCancelled() && connection.getEntity().getStartBreak() == 0 ) {
+                        connection.getEntity().setBreakVector( packet.getPosition() );
+                        connection.getEntity().setStartBreak( currentTimeMillis );
 
-                            io.gomint.server.world.block.Block block = connection.getEntity().getWorld().getBlockAt( packet.getPosition() );
+                        io.gomint.server.world.block.Block block = connection.getEntity().getWorld().getBlockAt( packet.getPosition() );
 
-                            long breakTime = block.getFinalBreakTime( connection.getEntity().getInventory().getItemInHand(), connection.getEntity() );
-                            LOGGER.debug( "Sending break time: " + breakTime );
+                        long breakTime = block.getFinalBreakTime( connection.getEntity().getInventory().getItemInHand(), connection.getEntity() );
+                        LOGGER.debug( "Sending break time {} ms", breakTime );
 
-                            // Tell the client which break time we want
-                            if ( breakTime > 0 ) {
-                                connection.getEntity().getWorld().playLevelEvent( packet.getPosition().toVector(),
-                                    LevelEvent.BLOCK_START_BREAK, (int) ( 65536 / ( breakTime / 50 ) ) );
-                            }
+                        // Tell the client which break time we want
+                        if ( breakTime > 0 ) {
+                            connection.getEntity().getWorld().sendLevelEvent( packet.getPosition().toVector(),
+                                LevelEvent.BLOCK_START_BREAK, (int) ( 65536 / ( breakTime / 50 ) ) );
                         }
                     }
 
                     // Nasty hack for fire
                     io.gomint.server.world.block.Block block = connection.getEntity().getWorld().getBlockAt( packet.getPosition() );
-                    Block faced = (Block) block.getSide( packet.getFace() );
+                    Block faced = block.getSide( packet.getFace() );
                     if ( faced instanceof Fire ) {
-                        BlockBreakEvent event1 = new BlockBreakEvent( connection.getEntity(), faced );
+                        BlockBreakEvent event1 = new BlockBreakEvent( connection.getEntity(), faced, new ArrayList<>() );
                         connection.getServer().getPluginManager().callEvent( event1 );
                         if ( !event1.isCancelled() ) {
                             faced.setType( Air.class );
@@ -66,7 +79,7 @@ public class PacketPlayerActionHandler implements PacketHandler<PacketPlayerActi
             case STOP_BREAK:
                 // Send abort break animation
                 if ( connection.getEntity().getBreakVector() != null ) {
-                    connection.getEntity().getWorld().playLevelEvent( connection.getEntity().getBreakVector().toVector(), LevelEvent.BLOCK_STOP_BREAK, 0 );
+                    connection.getEntity().getWorld().sendLevelEvent( connection.getEntity().getBreakVector().toVector(), LevelEvent.BLOCK_STOP_BREAK, 0 );
                 }
 
                 // Reset when abort
@@ -86,34 +99,61 @@ public class PacketPlayerActionHandler implements PacketHandler<PacketPlayerActi
 
                 break;
             case START_SNEAK:
-                connection.getEntity().setSneaking( true );
+                if(!connection.getEntity().isSneaking()){
+                    PlayerToggleSneakEvent playerToggleSneakEvent = new PlayerToggleSneakEvent( connection.getEntity(), true );
+                    connection.getServer().getPluginManager().callEvent( playerToggleSneakEvent );
+                    if( playerToggleSneakEvent.isCancelled() ){
+                        connection.getEntity().sendData( connection.getEntity() );
+                    }else{
+                        connection.getEntity().setSneaking( true );
+                    }
+                }
                 break;
             case STOP_SNEAK:
-                connection.getEntity().setSneaking( false );
+                if(connection.getEntity().isSneaking()) {
+                    PlayerToggleSneakEvent playerToggleSneakEvent = new PlayerToggleSneakEvent( connection.getEntity(), false );
+                    connection.getServer().getPluginManager().callEvent( playerToggleSneakEvent );
+                    if( playerToggleSneakEvent.isCancelled() ) {
+                        connection.getEntity().sendData( connection.getEntity() );
+                    }else{
+                        connection.getEntity().setSneaking( false );
+                    }
+                }
                 break;
-
             case START_SPRINT:
-                connection.getEntity().setSprinting( true );
+                if(!connection.getEntity().isSprinting()) {
+                    PlayerToggleSprintEvent playerToggleSprintEvent = new PlayerToggleSprintEvent( connection.getEntity(), true );
+                    connection.getServer().getPluginManager().callEvent( playerToggleSprintEvent );
+                    if( playerToggleSprintEvent.isCancelled() ) {
+                        connection.getEntity().sendData( connection.getEntity() );
+                    }else{
+                        connection.getEntity().setSprinting( true );
+                    }
+                }
                 break;
 
             case STOP_SPRINT:
-                connection.getEntity().setSprinting( false );
+                if(connection.getEntity().isSprinting()) {
+                    PlayerToggleSprintEvent playerToggleSprintEvent = new PlayerToggleSprintEvent( connection.getEntity(), false );
+                    connection.getServer().getPluginManager().callEvent( playerToggleSprintEvent );
+                    if( playerToggleSprintEvent.isCancelled() ) {
+                        connection.getEntity().sendData( connection.getEntity() );
+                    }else{
+                        connection.getEntity().setSprinting( false );
+                    }
+                }
                 break;
 
             case CONTINUE_BREAK:
-                // When the player is in creative this is the only way to get needed data since it doesn't send a
-                // START_BREAK
-                if ( connection.getEntity().getGamemode() == Gamemode.CREATIVE && connection.getEntity().getBreakVector() == null ) {
-                    connection.getEntity().setBreakVector( packet.getPosition() );
-                }
-
                 // Broadcast break effects
                 if ( connection.getEntity().getBreakVector() != null ) {
                     Block block = connection.getEntity().getWorld().getBlockAt( connection.getEntity().getBreakVector() );
-                    connection.getEntity().getWorld().playLevelEvent(
+                    int runtimeId = BlockRuntimeIDs.fromLegacy( block.getBlockId(), block.getBlockData() );
+
+                    connection.getEntity().getWorld().sendLevelEvent(
                         connection.getEntity().getBreakVector().toVector(),
                         LevelEvent.PARTICLE_PUNCH_BLOCK,
-                        block.getBlockId() | ( block.getBlockData() << 8 ) | ( packet.getFace() << 16 ) );
+                        runtimeId | ( packet.getFace().ordinal() << 24 ) );
                 }
 
                 break;
@@ -124,7 +164,32 @@ public class PacketPlayerActionHandler implements PacketHandler<PacketPlayerActi
 
             case RESPAWN:
                 connection.getEntity().respawn();
+                break;
 
+            case START_GLIDE:
+                // Accept client value (to get the dirty state in the metadata)
+                if ( !connection.getEntity().isGliding() ) {
+                    PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent( connection.getEntity(), true );
+                    connection.getEntity().getWorld().getServer().getPluginManager().callEvent( playerToggleGlideEvent );
+                    if ( playerToggleGlideEvent.isCancelled() ) {
+                        connection.getEntity().sendData( connection.getEntity() );
+                    } else {
+                        connection.getEntity().setGliding( true );
+                    }
+                }
+
+                break;
+
+            case STOP_GLIDE:
+                if ( connection.getEntity().isGliding() ) {
+                    PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent( connection.getEntity(), false );
+                    connection.getEntity().getWorld().getServer().getPluginManager().callEvent( playerToggleGlideEvent );
+                    if ( playerToggleGlideEvent.isCancelled() ) {
+                        connection.getEntity().sendData( connection.getEntity() );
+                    } else {
+                        connection.getEntity().setGliding( false );
+                    }
+                }
                 break;
 
             default:

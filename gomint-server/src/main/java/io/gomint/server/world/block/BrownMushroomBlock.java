@@ -26,4 +26,9 @@ public class BrownMushroomBlock extends Block implements io.gomint.world.block.B
         return BlockType.BROWN_MUSHROOM_BLOCK;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

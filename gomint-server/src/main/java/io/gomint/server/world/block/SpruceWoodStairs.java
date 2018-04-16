@@ -31,4 +31,9 @@ public class SpruceWoodStairs extends Stairs {
         return BlockType.SPRUCE_WOOD_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

@@ -1,14 +1,13 @@
 package io.gomint.server.inventory;
 
-import io.gomint.GoMint;
+import io.gomint.entity.Entity;
 import io.gomint.inventory.item.ItemAir;
 import io.gomint.inventory.item.ItemStack;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.network.PlayerConnection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,9 +17,7 @@ import java.util.Set;
  */
 public abstract class Inventory implements io.gomint.inventory.Inventory {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger( Inventory.class );
-
-    protected final InventoryHolder owner;
+    protected InventoryHolder owner;
     protected Set<PlayerConnection> viewer = new HashSet<>();
 
     protected int size;
@@ -49,6 +46,11 @@ public abstract class Inventory implements io.gomint.inventory.Inventory {
 
     @Override
     public void setItem( int index, ItemStack item ) {
+        // Prevent invalid null items
+        if ( item == null ) {
+            item = ItemAir.create( 0 );
+        }
+
         this.contents[index] = item;
 
         for ( PlayerConnection playerConnection : this.viewer ) {
@@ -100,7 +102,7 @@ public abstract class Inventory implements io.gomint.inventory.Inventory {
                 if ( content instanceof ItemAir ) {
                     return true;
                 } else if ( content.equals( clone ) &&
-                        content.getAmount() <= content.getMaximumAmount() ) {
+                    content.getAmount() <= content.getMaximumAmount() ) {
                     if ( content.getAmount() + clone.getAmount() <= content.getMaximumAmount() ) {
                         return true;
                     } else {
@@ -138,7 +140,7 @@ public abstract class Inventory implements io.gomint.inventory.Inventory {
             // First try to merge
             for ( int i = 0; i < this.contents.length; i++ ) {
                 if ( this.contents[i].equals( clone ) &&
-                        this.contents[i].getAmount() <= this.contents[i].getMaximumAmount() ) {
+                    this.contents[i].getAmount() <= this.contents[i].getMaximumAmount() ) {
                     if ( this.contents[i].getAmount() + clone.getAmount() <= this.contents[i].getMaximumAmount() ) {
                         this.contents[i].setAmount( this.contents[i].getAmount() + clone.getAmount() );
                         clone.setAmount( 0 );
@@ -172,8 +174,16 @@ public abstract class Inventory implements io.gomint.inventory.Inventory {
 
     @Override
     public void clear() {
+        if ( this.contents != null ) {
+            for ( int i = 0; i < this.contents.length; i++ ) {
+                if ( this.contents[i] != null ) {
+                     onRemove( i );
+                }
+            }
+        }
+
         this.contents = new ItemStack[this.size];
-        Arrays.fill( this.contents, GoMint.instance().createItemStack( ItemAir.class, 0 ) );
+        Arrays.fill( this.contents, ItemAir.create( 0 ) );
 
         // Inform all viewers
         for ( PlayerConnection playerConnection : this.viewer ) {
@@ -181,9 +191,24 @@ public abstract class Inventory implements io.gomint.inventory.Inventory {
         }
     }
 
+    protected void onRemove( int slot ) {
+
+    }
+
     public void resizeAndClear( int newSize ) {
         this.size = newSize;
         this.clear();
+    }
+
+    @Override
+    public Collection<Entity> getViewers() {
+        Set<Entity> viewers = new HashSet<>();
+
+        for ( PlayerConnection playerConnection : this.viewer ) {
+            viewers.add( playerConnection.getEntity() );
+        }
+
+        return viewers;
     }
 
 }

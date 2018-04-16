@@ -7,13 +7,23 @@
 
 package io.gomint.server.inventory.item;
 
+import io.gomint.GoMint;
+import io.gomint.enchant.Enchantment;
 import io.gomint.math.Vector;
+import io.gomint.server.GoMintServer;
 import io.gomint.server.entity.EntityPlayer;
-import io.gomint.world.block.Block;
 import io.gomint.taglib.NBTTagCompound;
+import io.gomint.world.block.Block;
+import io.gomint.world.block.BlockFace;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Represents a stack of up to 255 items of the same type which may
@@ -22,12 +32,18 @@ import java.util.List;
  * @author BlackyPaw
  * @version 1.0
  */
+@ToString
+@EqualsAndHashCode
 public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.ItemStack {
 
     private int material;
     private short data;
     private byte amount;
     private NBTTagCompound nbt;
+
+    // Cached enchantments
+    private Map<Class, Enchantment> enchantments;
+    private boolean dirtyEnchantments;
 
     /**
      * Constructs a new item stack that will hold the given amount
@@ -133,7 +149,7 @@ public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.I
     }
 
     /**
-     * Set new nbt data into the itemstack
+     * Set new nbt data into the item stack
      *
      * @param compound The raw NBT data of this item
      */
@@ -253,17 +269,83 @@ public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.I
     }
 
     @Override
-    public int hashCode() {
-        int hash = 157;
-        hash = 31 * hash + this.material;
-        hash = 31 * hash + this.data;
-        hash = 31 * hash + this.amount;
-        return hash;
+    public void addEnchantment( Class<? extends Enchantment> clazz, short level ) {
+        short id = ( (GoMintServer) GoMint.instance() ).getEnchantments().getId( clazz );
+        if ( id == -1 ) {
+            return;
+        }
+
+        if ( this.nbt == null ) {
+            this.nbt = new NBTTagCompound( "" );
+        }
+
+        List<Object> enchantmentList = this.nbt.getList( "ench", true );
+
+        NBTTagCompound enchCompound = new NBTTagCompound( null );
+        enchCompound.addValue( "id", id );
+        enchCompound.addValue( "lvl", level );
+        enchantmentList.add( enchCompound );
+
+        this.dirtyEnchantments = true;
     }
 
     @Override
-    public String toString() {
-        return String.format( "[ItemStack %s:%d x %d]", this.material, this.data, this.amount );
+    public <T extends Enchantment> T getEnchantment( Class<? extends Enchantment> clazz ) {
+        if ( this.dirtyEnchantments ) {
+            this.dirtyEnchantments = false;
+
+            if ( this.nbt == null ) {
+                return null;
+            }
+
+            List<Object> nbtEnchCompounds = this.nbt.getList( "ench", false );
+            if ( nbtEnchCompounds == null ) {
+                return null;
+            }
+
+            this.enchantments = new HashMap<>();
+            for ( Object compound : nbtEnchCompounds ) {
+                NBTTagCompound enchantCompound = (NBTTagCompound) compound;
+                io.gomint.server.enchant.Enchantment enchantment = ( (GoMintServer) GoMint.instance() ).getEnchantments().create(
+                    enchantCompound.getShort( "id", (short) 0 ),
+                    enchantCompound.getShort( "lvl", (short) 0 )
+                );
+
+                this.enchantments.put( enchantment.getClass().getInterfaces()[0], enchantment );
+            }
+        }
+
+        return this.enchantments == null ? null : (T) this.enchantments.get( clazz );
+    }
+
+    @Override
+    public void removeEnchantment( Class<? extends Enchantment> clazz ) {
+        short id = ( (GoMintServer) GoMint.instance() ).getEnchantments().getId( clazz );
+        if ( id == -1 ) {
+            return;
+        }
+
+        if ( this.nbt == null ) {
+            return;
+        }
+
+        List<Object> enchantmentList = this.nbt.getList( "ench", false );
+        if ( enchantmentList == null ) {
+            return;
+        }
+
+        for ( Object nbtObject : new ArrayList<>( enchantmentList ) ) {
+            NBTTagCompound enchCompound = (NBTTagCompound) nbtObject;
+            if ( enchCompound.getShort( "id", (short) -1 ) == id ) {
+                enchantmentList.remove( enchCompound );
+                this.dirtyEnchantments = true;
+                break;
+            }
+        }
+
+        if ( enchantmentList.isEmpty() ) {
+            this.nbt.remove( "ench" );
+        }
     }
 
     @Override
@@ -285,8 +367,8 @@ public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.I
         if ( !( other instanceof ItemStack ) ) return false;
         ItemStack otherItemStack = (ItemStack) other;
         return this.getMaterial() == otherItemStack.getMaterial() &&
-                this.getData() == otherItemStack.getData() &&
-                ( this.nbt == otherItemStack.nbt || this.nbt.equals( otherItemStack.nbt ) );
+            this.getData() == otherItemStack.getData() &&
+            Objects.equals( this.nbt, otherItemStack.nbt );
     }
 
     /**
@@ -303,7 +385,7 @@ public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.I
      */
     public boolean afterPlacement() {
         // In a normal case the amount decreases
-        return --this.amount == 0;
+        return this.amount > 0 && --this.amount == 0;
     }
 
     public boolean useDamageAsData() {
@@ -322,7 +404,7 @@ public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.I
         // Normal items do nothing
     }
 
-    public boolean interact( EntityPlayer entity, int face, Vector clickPosition, Block clickedBlock ) {
+    public boolean interact( EntityPlayer entity, BlockFace face, Vector clickPosition, Block clickedBlock ) {
         return false;
     }
 
@@ -349,6 +431,15 @@ public abstract class ItemStack implements Cloneable, io.gomint.inventory.item.I
         }
 
         return false;
+    }
+
+    /**
+     * Get the enchant ability of this item
+     *
+     * @return enchantment possibility
+     */
+    public int getEnchantAbility() {
+        return 0;
     }
 
 }

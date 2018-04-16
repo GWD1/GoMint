@@ -11,12 +11,8 @@ import org.slf4j.LoggerFactory;
  */
 public class PacketWorldSoundEventHandler implements PacketHandler<PacketWorldSoundEvent> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger( PacketWorldSoundEventHandler.class );
-
     @Override
     public void handle( PacketWorldSoundEvent packet, long currentTimeMillis, PlayerConnection connection ) {
-        LOGGER.info( packet.toString() );
-
         // Relay to all other players which can see this entity
         connection.getEntity().getWorld().sendToVisible( packet.getPosition().toBlockPosition(), packet, entity -> true );
     }

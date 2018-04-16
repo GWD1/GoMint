@@ -11,7 +11,7 @@ import lombok.Getter;
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.engines.AESFastEngine;
+import org.bouncycastle.crypto.engines.AESEngine;
 import org.bouncycastle.crypto.modes.CFBBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
@@ -81,6 +81,7 @@ public class EncryptionHandler {
     public boolean beginClientsideEncryption() {
         if ( this.clientEncryptor != null && this.clientDecryptor != null ) {
             // Already initialized:
+            LOGGER.debug( "Already initialized" );
             return true;
         }
 
@@ -122,7 +123,7 @@ public class EncryptionHandler {
 
         byte[] hashBytes = calcHash( outputChunked, this.receiveCounter );
         for ( int i = output.length - 8; i < output.length; i++ ) {
-            if ( hashBytes[i - (output.length - 8)] != output[i] ) {
+            if ( hashBytes[i - ( output.length - 8 )] != output[i] ) {
                 return null;
             }
         }
@@ -228,7 +229,7 @@ public class EncryptionHandler {
     }
 
     private BufferedBlockCipher createCipher( boolean encryptor, byte[] key, byte[] iv ) {
-        BufferedBlockCipher cipher = new BufferedBlockCipher( new CFBBlockCipher( new AESFastEngine(), 8 ) );
+        BufferedBlockCipher cipher = new BufferedBlockCipher( new CFBBlockCipher( new AESEngine(), 8 ) );
         cipher.init( encryptor, new ParametersWithIV( new KeyParameter( key ), iv ) );
         return cipher;
     }

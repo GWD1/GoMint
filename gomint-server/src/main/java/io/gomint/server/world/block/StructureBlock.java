@@ -6,6 +6,7 @@ import io.gomint.server.registry.RegisterInfo;
 
 /**
  * @author geNAZt
+ * @version 1.0
  */
 @RegisterInfo( id = 252 )
 public class StructureBlock extends Block implements io.gomint.world.block.BlockStructureBlock {
@@ -23,6 +24,11 @@ public class StructureBlock extends Block implements io.gomint.world.block.Block
     @Override
     public BlockType getType() {
         return BlockType.STRUCTURE_BLOCK;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

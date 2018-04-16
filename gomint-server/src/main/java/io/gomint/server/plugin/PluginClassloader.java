@@ -28,6 +28,18 @@ public class PluginClassloader extends URLClassLoader {
         applicationClassloader = GoMint.class.getClassLoader();
     }
 
+    public static Class<?> find( String name ) throws ClassNotFoundException {
+        for ( PluginClassloader loader : ALL_LOADERS ) {
+            try {
+                return loader.loadClass( name, false );
+            } catch ( ClassNotFoundException e ) {
+                LOGGER.debug( "Could not find class in plugin", e );
+            }
+        }
+
+        return applicationClassloader.loadClass( name );
+    }
+
     /**
      * Create a new plugin class loader
      *

@@ -26,8 +26,7 @@ public class Harm extends Effect {
     @Override
     public void apply( EntityLiving entity ) {
         // TODO: Effect for undead
-        EntityDamageEvent damageEvent = new EntityDamageEvent( entity, EntityDamageEvent.DamageSource.HARM_EFFECT, 6 << this.amplifier );
-        entity.damage( damageEvent );
+        entity.attack( 6 << this.amplifier, EntityDamageEvent.DamageSource.HARM_EFFECT );
     }
 
     @Override

@@ -99,6 +99,7 @@ public interface World {
      * @param sound    The sound which should be played
      * @param pitch    The pitch at which the sound should be played
      * @param data     additional data for the sound
+     * @throws IllegalArgumentException when the sound data given is incorrect for the sound wanted to play
      */
     void playSound( Vector location, Sound sound, byte pitch, SoundData data );
 
@@ -110,6 +111,24 @@ public interface World {
      * @param pitch    The pitch at which the sound should be played
      */
     void playSound( Vector location, Sound sound, byte pitch );
+
+    /**
+     * Send a particle to this world
+     *
+     * @param location of the particle in the client
+     * @param particle which should be send
+     */
+    void sendParticle( Vector location, Particle particle );
+
+    /**
+     * Send a particle to this world
+     *
+     * @param location of the particle in the client
+     * @param particle which should be send
+     * @param data     data with which this particle should be send
+     * @throws IllegalArgumentException when the particle data is incorrect for the particle which should be send
+     */
+    void sendParticle( Vector location, Particle particle, ParticleData data );
 
     /**
      * Get a list of bounding boxes which collide with the given box
@@ -133,8 +152,42 @@ public interface World {
     /**
      * Unload this world. All remaining players in this world get called through the consumer
      *
-     * @param playerConsumer which gets alled for every player in this world
+     * @param playerConsumer which gets called for every player in this world
      */
     void unload( Consumer<EntityPlayer> playerConsumer );
+
+    /**
+     * Iterate over all loaded chunks and find the blocks specified for the blockClass.
+     * This method is very expensive since it fully blocks the server until the search operation has
+     * been completed.
+     *
+     * @param blockClass    for which we search
+     * @param blockConsumer which gets called for every found block
+     * @param <T>           type of block
+     */
+    <T extends Block> void iterateBlocks( Class<T> blockClass, Consumer<T> blockConsumer );
+
+    /**
+     * Iterate over all loaded chunks and find the entities specified for the entityClass.
+     *
+     * @param entityClass    for which we search
+     * @param entityConsumer which gets called for every found entity
+     * @param <T>            type of entity
+     */
+    <T extends Entity> void iterateEntities( Class<T> entityClass, Consumer<T> entityConsumer );
+
+    /**
+     * Generate a empty chunk
+     *
+     * @param x coordinate of the chunk
+     * @param z coordinate of the chunk
+     * @return chunk with only air in it
+     */
+    Chunk generateEmptyChunk( int x, int z );
+
+    /**
+     * Save all data to disk
+     */
+    void save();
 
 }

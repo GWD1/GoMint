@@ -31,4 +31,9 @@ public class OrangeGlazedTerracotta extends Block implements io.gomint.world.blo
         return BlockType.ORANGE_GLAZED_TERRACOTTA;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

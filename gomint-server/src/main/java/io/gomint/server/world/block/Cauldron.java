@@ -36,4 +36,9 @@ public class Cauldron extends Block implements io.gomint.world.block.BlockCauldr
         return BlockType.CAULDRON;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

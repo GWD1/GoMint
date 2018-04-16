@@ -60,6 +60,11 @@ public class ProjectileLaunchEvent extends CancellableEntityEvent {
          */
         FISHING_ROD,
 
+        /**
+         * Throwing ender pearls
+         */
+        THROWING_ENDER_PEARL,
+
     }
 
 }

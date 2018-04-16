@@ -23,4 +23,11 @@ public class Toggle extends Element {
         return obj;
     }
 
+    @Override
+    public Object getAnswer( Object answerOption ) {
+        boolean answer = (boolean) answerOption;
+        this.value = answer;
+        return answer;
+    }
+
 }

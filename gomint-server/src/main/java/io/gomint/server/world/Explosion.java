@@ -199,7 +199,7 @@ public class Explosion {
             block.setType( Air.class );
 
             for ( BlockFace blockFace : BlockFace.values() ) {
-                Block attached = block.getSide( blockFace.getValue() );
+                Block attached = block.getSide( blockFace );
                 if ( !event.getAffectedBlocks().contains( attached ) && !alreadyUpdated.contains( attached ) ) {
                     io.gomint.server.world.block.Block implBlock = (io.gomint.server.world.block.Block) attached;
                     implBlock.update( UpdateReason.EXPLOSION, currentTimeMS, dT );
@@ -215,15 +215,10 @@ public class Explosion {
         explode.setSource( sourceLocation );
         explode.setRadius( this.size );
         explode.setAffectedBlocksRelative( send );
-        this.source.getWorld().sendToVisible( sourceLocation.toBlockPosition(), explode, new Predicate<io.gomint.entity.Entity>() {
-            @Override
-            public boolean test( io.gomint.entity.Entity entity ) {
-                return true;
-            }
-        } );
+        this.source.getWorld().sendToVisible( sourceLocation.toBlockPosition(), explode, entity -> true );
 
-        this.source.getWorld().playParticle( sourceLocation, Particle.HUGE_EXPLODE_SEED, 0 );
-        this.source.getWorld().playLevelEvent( sourceLocation, LevelEvent.CAULDRON_EXPLODE, 0 );
+        this.source.getWorld().sendParticle( sourceLocation, Particle.HUGE_EXPLODE_SEED );
+        this.source.getWorld().sendLevelEvent( sourceLocation, LevelEvent.CAULDRON_EXPLODE, 0 );
     }
 
 }

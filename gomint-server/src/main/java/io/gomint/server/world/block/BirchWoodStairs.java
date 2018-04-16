@@ -31,4 +31,9 @@ public class BirchWoodStairs extends Stairs {
         return BlockType.BIRCH_WOOD_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

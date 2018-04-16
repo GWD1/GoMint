@@ -1,10 +1,8 @@
 package io.gomint.server.world.block;
 
-import io.gomint.world.block.BlockType;
-
 import io.gomint.inventory.item.ItemStack;
-import io.gomint.server.inventory.item.Items;
 import io.gomint.server.registry.RegisterInfo;
+import io.gomint.world.block.BlockType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,19 +43,19 @@ public class Crops extends Growable {
     public List<ItemStack> getDrops( ItemStack itemInHand ) {
         if ( getBlockData() >= 0x07 ) {
             List<ItemStack> drops = new ArrayList<ItemStack>() {{
-                add( Items.create( 296, (short) 0, (byte) 1, null ) ); // Beetroot
+                add( world.getServer().getItems().create( 296, (short) 0, (byte) 1, null ) ); // Beetroot
             }};
 
             // Randomize seeds
             int amountOfSeeds = SEED_RANDOMIZER.next();
             if ( amountOfSeeds > 0 ) {
-                drops.add( Items.create( 295, (short) 0, (byte) amountOfSeeds, null ) ); // Seeds
+                drops.add( world.getServer().getItems().create( 295, (short) 0, (byte) amountOfSeeds, null ) ); // Seeds
             }
 
             return drops;
         } else {
             return new ArrayList<ItemStack>() {{
-                add( Items.create( 295, (short) 0, (byte) 1, null ) ); // Seeds
+                add( world.getServer().getItems().create( 295, (short) 0, (byte) 1, null ) ); // Seeds
             }};
         }
     }
@@ -70,6 +68,11 @@ public class Crops extends Growable {
     @Override
     public BlockType getType() {
         return BlockType.CROPS;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

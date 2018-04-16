@@ -36,4 +36,9 @@ public class Fence extends Block implements io.gomint.world.block.BlockFence {
         return BlockType.FENCE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

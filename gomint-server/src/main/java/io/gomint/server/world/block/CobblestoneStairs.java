@@ -31,4 +31,9 @@ public class CobblestoneStairs extends Stairs {
         return BlockType.COBBLESTONE_STAIRS;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

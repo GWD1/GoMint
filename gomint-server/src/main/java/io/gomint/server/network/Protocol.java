@@ -21,9 +21,9 @@ public final class Protocol {
 
     // CHECKSTYLE:OFF
     // MC:PE Protocol ID
-    public static final int MINECRAFT_PE_BETA_PROTOCOL_VERSION = 141;
-    public static final int MINECRAFT_PE_PROTOCOL_VERSION = 137;
-    public static final String MINECRAFT_PE_NETWORK_VERSION = "1.2.5.15";
+    public static final int MINECRAFT_PE_BETA_PROTOCOL_VERSION = 260;
+    public static final int MINECRAFT_PE_PROTOCOL_VERSION = 223;
+    public static final String MINECRAFT_PE_NETWORK_VERSION = "1.2.13";
 
     // ========================================= PACKET IDS ========================================= //
     public static final byte PACKET_BATCH = (byte) 0xfe;
@@ -59,9 +59,11 @@ public final class Protocol {
     public static final byte PACKET_MOB_ARMOR_EQUIPMENT = (byte) 0x20;
     public static final byte PACKET_INTERACT = (byte) 0x21;
     public static final byte PACKET_PLAYER_ACTION = (byte) 0x24;
+    public static final byte PACKET_ENTITY_FALL = (byte) 0x25;
     public static final byte PACKET_HURT_ARMOR = (byte) 0x26;
     public static final byte PACKET_ENTITY_METADATA = (byte) 0x27;
     public static final byte PACKET_ENTITY_MOTION = (byte) 0x28;
+    public static final byte PACKET_SET_SPAWN_POSITION = (byte) 0x2B;
     public static final byte PACKET_ANIMATE = (byte) 0x2C;
     public static final byte PACKET_RESPAWN_POSITION = (byte) 0x2D;
     public static final byte PACKET_CONTAINER_OPEN = (byte) 0x2E;
@@ -81,12 +83,19 @@ public final class Protocol {
     public static final byte PACKET_PLAYER_LIST = (byte) 0x3F;
     public static final byte PACKET_SET_CHUNK_RADIUS = (byte) 0x45;
     public static final byte PACKET_CONFIRM_CHUNK_RADIUS = (byte) 0x46;
+    public static final byte PACKET_BOSS_BAR = (byte) 0x4a;
     public static final byte PACKET_AVAILABLE_COMMANDS = (byte) 0x4c;
     public static final byte PACKET_COMMAND_REQUEST = (byte) 0x4d;
     public static final byte PACKET_COMMAND_OUTPUT = (byte) 0x4f;
     public static final byte PACKET_TRANSFER = (byte) 0x55;
     public static final byte PACKET_MODAL_REQUEST = (byte) 0x64;
     public static final byte PACKET_MODAL_RESPONSE = (byte) 0x65;
+    public static final byte PACKET_SERVER_SETTINGS_REQUEST = (byte) 0x66;
+    public static final byte PACKET_SERVER_SETTINGS_RESPONSE = (byte) 0x67;
+    public static final byte PACKET_REMOVE_OBJECTIVE = (byte) 0x6a;
+    public static final byte PACKET_SET_OBJECTIVE = (byte) 0x6b;
+    public static final byte PACKET_SET_SCORE = (byte) 0x6c;
+    public static final byte PACKET_SET_TITLE = (byte) 0x58;
 
     public static final byte PACKET_SET_COMPASS_TARGET = (byte) 0xB1;
     // CHECKSTYLE:ON
@@ -106,6 +115,18 @@ public final class Protocol {
      */
     public static Packet createPacket( byte id ) {
         switch ( id ) {
+            case PACKET_ENTITY_FALL:
+                return new PacketEntityFall();
+
+            case PACKET_BOSS_BAR:
+                return new PacketBossBar();
+
+            case PACKET_SERVER_SETTINGS_REQUEST:
+                return new PacketServerSettingsRequest();
+
+            case PACKET_MOB_EQUIPMENT:
+                return new PacketMobEquipment();
+
             case PACKET_MODAL_RESPONSE:
                 return new PacketModalResponse();
 
@@ -142,20 +163,8 @@ public final class Protocol {
             case PACKET_RESOURCEPACK_INFO:
                 return new PacketResourcePacksInfo();
 
-            case PACKET_WORLD_TIME:
-                return new PacketWorldTime();
-
             case PACKET_RESOURCEPACK_RESPONSE:
                 return new PacketResourcePackResponse();
-
-            case PACKET_SPAWN_ENTITY:
-                return new PacketSpawnEntity();
-
-            case PACKET_DESPAWN_ENTITY:
-                return new PacketDespawnEntity();
-
-            case PACKET_ENTITY_MOVEMENT:
-                return new PacketEntityMovement();
 
             case PACKET_WORLD_SOUND_EVENT:
                 return new PacketWorldSoundEvent();
@@ -169,14 +178,8 @@ public final class Protocol {
             case PACKET_ANIMATE:
                 return new PacketAnimate();
 
-            case PACKET_CONTAINER_OPEN:
-                return new PacketContainerOpen();
-
             case PACKET_CONTAINER_CLOSE:
                 return new PacketContainerClose();
-
-            case PACKET_INVENTORY_SET_SLOT:
-                return new PacketInventorySetSlot();
 
             case PACKET_CRAFTING_EVENT:
                 return new PacketCraftingEvent();
@@ -184,32 +187,11 @@ public final class Protocol {
             case PACKET_ADVENTURE_SETTINGS:
                 return new PacketAdventureSettings();
 
-            case PACKET_MOB_EQUIPMENT:
-                return new PacketMobEquipment();
-
             case PACKET_INTERACT:
                 return new PacketInteract();
 
-            case PACKET_MOB_ARMOR_EQUIPMENT:
-                return new PacketMobArmorEquipment();
-
             case PACKET_ENTITY_METADATA:
                 return new PacketEntityMetadata();
-
-            case PACKET_ENTITY_MOTION:
-                return new PacketEntityMotion();
-
-            case PACKET_CRAFTING_RECIPES:
-                return new PacketCraftingRecipes();
-
-            case PACKET_WORLD_CHUNK:
-                return new PacketWorldChunk();
-
-            case PACKET_SET_COMMANDS_ENABLED:
-                return new PacketSetCommandsEnabled();
-
-            case PACKET_SET_DIFFICULTY:
-                return new PacketSetDifficulty();
 
             case PACKET_SET_CHUNK_RADIUS:
                 return new PacketSetChunkRadius();

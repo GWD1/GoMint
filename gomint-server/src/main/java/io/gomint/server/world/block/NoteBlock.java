@@ -1,5 +1,6 @@
 package io.gomint.server.world.block;
 
+import io.gomint.world.block.BlockFace;
 import io.gomint.world.block.BlockType;
 
 import io.gomint.server.entity.Entity;
@@ -27,7 +28,7 @@ public class NoteBlock extends Block implements BlockNoteblock {
     }
 
     @Override
-    public boolean interact( Entity entity, int face, Vector facePos, ItemStack item ) {
+    public boolean interact( Entity entity, BlockFace face, Vector facePos, ItemStack item ) {
         NoteblockTileEntity tileEntity = getTileEntity();
         if ( tileEntity != null ) {
             tileEntity.interact( entity, face, facePos, item );
@@ -52,6 +53,11 @@ public class NoteBlock extends Block implements BlockNoteblock {
     @Override
     public BlockType getType() {
         return BlockType.NOTE_BLOCK;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

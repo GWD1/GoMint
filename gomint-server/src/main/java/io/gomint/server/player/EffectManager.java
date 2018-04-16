@@ -7,18 +7,17 @@
 
 package io.gomint.server.player;
 
-import com.koloboke.collect.ObjCursor;
-import com.koloboke.collect.map.ByteObjCursor;
+import io.gomint.entity.Entity;
 import io.gomint.math.MathUtils;
 import io.gomint.server.entity.EntityLiving;
 import io.gomint.server.entity.EntityPlayer;
 import io.gomint.server.entity.potion.effect.Effect;
 import io.gomint.server.network.packet.PacketMobEffect;
-import io.gomint.server.util.collection.EffectIDMap;
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.bytes.ByteOpenHashSet;
+import it.unimi.dsi.fastutil.bytes.ByteSet;
 import lombok.RequiredArgsConstructor;
-
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * @author geNAZt
@@ -28,7 +27,7 @@ import java.util.Set;
 public class EffectManager {
 
     private final EntityLiving living;
-    private final EffectIDMap effects = EffectIDMap.withExpectedSize( 4 );
+    private final Byte2ObjectMap<Effect> effects = new Byte2ObjectOpenHashMap<>();
 
     /**
      * Update effects (look if we can remove some)
@@ -37,24 +36,25 @@ public class EffectManager {
      * @param dT                difference time for a full second
      */
     public void update( long currentTimeMillis, float dT ) {
-        Set<Byte> removeEffects = null;
+        if ( !this.effects.isEmpty() ) {
+            ByteSet removeEffects = null;
 
-        ByteObjCursor<Effect> cursor = this.effects.cursor();
-        while ( cursor.moveNext() ) {
-            if ( currentTimeMillis >= cursor.value().getRunoutTimer() ) {
-                if ( removeEffects == null ) {
-                    removeEffects = new HashSet<>();
+            for ( Byte2ObjectMap.Entry<Effect> entry : this.effects.byte2ObjectEntrySet() ) {
+                if ( currentTimeMillis >= entry.getValue().getRunoutTimer() ) {
+                    if ( removeEffects == null ) {
+                        removeEffects = new ByteOpenHashSet();
+                    }
+
+                    removeEffects.add( entry.getByteKey() );
+                } else {
+                    entry.getValue().update( currentTimeMillis, dT );
                 }
-
-                removeEffects.add( cursor.key() );
-            } else {
-                cursor.value().update( currentTimeMillis, dT );
             }
-        }
 
-        if ( removeEffects != null ) {
-            for ( Byte removeEffect : removeEffects ) {
-                removeEffect( removeEffect );
+            if ( removeEffects != null ) {
+                for ( Byte removeEffect : removeEffects ) {
+                    removeEffect( removeEffect );
+                }
             }
         }
     }
@@ -79,7 +79,7 @@ public class EffectManager {
         }
 
         effect.apply( this.living );
-        this.effects.justPut( id, effect );
+        this.effects.put( id, effect );
     }
 
     /**
@@ -100,15 +100,14 @@ public class EffectManager {
      * Remove all active effects
      */
     public void removeAll() {
-        Set<Byte> removeEffects = null;
+        ByteSet removeEffects = null;
 
-        ByteObjCursor<Effect> cursor = this.effects.cursor();
-        while ( cursor.moveNext() ) {
+        for ( Byte2ObjectMap.Entry<Effect> entry : this.effects.byte2ObjectEntrySet() ) {
             if ( removeEffects == null ) {
-                removeEffects = new HashSet<>();
+                removeEffects = new ByteOpenHashSet();
             }
 
-            removeEffects.add( cursor.key() );
+            removeEffects.add( entry.getByteKey() );
         }
 
         if ( removeEffects != null ) {
@@ -132,9 +131,7 @@ public class EffectManager {
         }
 
         if ( visible ) {
-            ObjCursor<io.gomint.entity.Entity> cursor = this.living.getAttachedEntities().cursor();
-            while ( cursor.moveNext() ) {
-                io.gomint.entity.Entity entity = cursor.elem();
+            for ( Entity entity : this.living.getAttachedEntities() ) {
                 if ( entity instanceof EntityPlayer ) {
                     ( (EntityPlayer) entity ).getConnection().addToSendQueue( mobEffect );
                 }
@@ -152,16 +149,15 @@ public class EffectManager {
     }
 
     public void sendForPlayer( EntityPlayer player ) {
-        ByteObjCursor<Effect> cursor = this.effects.cursor();
-        while ( cursor.moveNext() ) {
-            if ( cursor.value().isVisible() ) {
+        for ( Byte2ObjectMap.Entry<Effect> entry : this.effects.byte2ObjectEntrySet() ) {
+            if ( entry.getValue().isVisible() ) {
                 PacketMobEffect mobEffect = new PacketMobEffect();
                 mobEffect.setEntityId( this.living.getEntityId() );
                 mobEffect.setAction( PacketMobEffect.EVENT_ADD );
-                mobEffect.setEffectId( cursor.key() );
-                mobEffect.setAmplifier( cursor.value().getAmplifier() );
+                mobEffect.setEffectId( entry.getByteKey() );
+                mobEffect.setAmplifier( entry.getValue().getAmplifier() );
                 mobEffect.setVisible( true );
-                mobEffect.setDuration( MathUtils.fastFloor( ( cursor.value().getRunoutTimer() - this.living.getWorld().getServer().getCurrentTickTime() ) / 50f ) );
+                mobEffect.setDuration( MathUtils.fastFloor( ( entry.getValue().getRunoutTimer() - this.living.getWorld().getServer().getCurrentTickTime() ) / 50f ) );
                 player.getConnection().addToSendQueue( mobEffect );
             }
         }

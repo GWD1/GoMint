@@ -5,11 +5,15 @@ import io.gomint.server.network.Protocol;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * @author geNAZt
+ * @version 1.0
+ */
 public class PacketTransfer extends Packet {
 
-    @Getter@Setter
+    @Getter @Setter
     private String address;
-    @Getter@Setter
+    @Getter @Setter
     private int port = 19132;
 
     public PacketTransfer() {
@@ -17,13 +21,13 @@ public class PacketTransfer extends Packet {
     }
 
     @Override
-    public void serialize( PacketBuffer buffer ) {
-        buffer.writeString( address );
-        buffer.writeLShort( (short) port );
+    public void serialize( PacketBuffer buffer, int protocolID ) {
+        buffer.writeString( this.address );
+        buffer.writeLShort( (short) this.port );
     }
 
     @Override
-    public void deserialize( PacketBuffer buffer ) {
+    public void deserialize( PacketBuffer buffer, int protocolID ) {
         this.address = buffer.readString();
         this.port = buffer.readLShort();
     }

@@ -27,14 +27,7 @@ public class ItemFrame extends Block implements io.gomint.world.block.BlockItemF
 
     @Override
     TileEntity createTileEntity( NBTTagCompound compound ) {
-        BlockPosition position = this.location.toBlockPosition();
-
-        compound = new NBTTagCompound( "" );
-
-        // Add generic tile entity stuff
-        compound.addValue( "x", position.getX() );
-        compound.addValue( "y", position.getY() );
-        compound.addValue( "z", position.getZ() );
+        super.createTileEntity( compound );
 
         // Set item
         NBTTagCompound item = new NBTTagCompound( "Item" );
@@ -56,6 +49,11 @@ public class ItemFrame extends Block implements io.gomint.world.block.BlockItemF
     @Override
     public BlockType getType() {
         return BlockType.ITEM_FRAME;
+    }
+
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
     }
 
 }

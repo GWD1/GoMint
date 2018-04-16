@@ -36,4 +36,9 @@ public class NetherWart extends Block implements io.gomint.world.block.BlockNeth
         return BlockType.NETHER_WART;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

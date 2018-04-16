@@ -36,4 +36,9 @@ public class RedstoneLampInactive extends Block implements io.gomint.world.block
         return BlockType.REDSTONE_LAMP_INACTIVE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

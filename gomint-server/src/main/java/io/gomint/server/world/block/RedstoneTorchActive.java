@@ -36,4 +36,9 @@ public class RedstoneTorchActive extends Block implements io.gomint.world.block.
         return BlockType.REDSTONE_TORCH_ACTIVE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

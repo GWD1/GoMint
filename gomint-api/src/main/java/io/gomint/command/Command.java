@@ -3,6 +3,8 @@ package io.gomint.command;
 import io.gomint.command.annotation.*;
 import io.gomint.entity.EntityPlayer;
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -21,6 +23,8 @@ import java.util.*;
  */
 @Getter
 public abstract class Command {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger( Command.class );
 
     private final String name;
     private String description;
@@ -79,7 +83,7 @@ public abstract class Command {
     }
 
     private void registerOverloadAnnotation( Overload annotation ) {
-        CommandOverload overload = this.overload();
+        CommandOverload overloadHolder = this.overload();
 
         for ( Parameter parameter : annotation.value() ) {
             // Search for either a no arg, string or a list<string> constructor
@@ -127,24 +131,24 @@ public abstract class Command {
                 try {
                     validator = constructor.newInstance( argumentString );
                 } catch ( InstantiationException | IllegalAccessException | InvocationTargetException e ) {
-                    e.printStackTrace();
+                    LOGGER.error( "Could not build command", e );
                 }
             } else if ( needsList ) {
                 try {
                     validator = constructor.newInstance( argumentList );
                 } catch ( InstantiationException | IllegalAccessException | InvocationTargetException e ) {
-                    e.printStackTrace();
+                    LOGGER.error( "Could not build command", e );
                 }
             } else {
                 try {
                     validator = constructor.newInstance();
                 } catch ( InstantiationException | IllegalAccessException | InvocationTargetException e ) {
-                    e.printStackTrace();
+                    LOGGER.error( "Could not build command", e );
                 }
             }
 
             if ( validator != null ) {
-                overload.param( parameter.name(), validator, parameter.optional() );
+                overloadHolder.param( parameter.name(), validator, parameter.optional() );
             }
         }
     }

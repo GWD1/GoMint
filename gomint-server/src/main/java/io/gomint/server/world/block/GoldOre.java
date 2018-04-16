@@ -31,4 +31,9 @@ public class GoldOre extends Block implements io.gomint.world.block.BlockGoldOre
         return BlockType.GOLD_ORE;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

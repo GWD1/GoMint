@@ -36,4 +36,9 @@ public class SeaLantern extends Block implements io.gomint.world.block.BlockSeaL
         return BlockType.SEA_LANTERN;
     }
 
+    @Override
+    public boolean canBeBrokenWithHand() {
+        return true;
+    }
+
 }

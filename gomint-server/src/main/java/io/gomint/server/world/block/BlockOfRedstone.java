@@ -1,8 +1,11 @@
 package io.gomint.server.world.block;
 
+import io.gomint.inventory.item.*;
+import io.gomint.server.registry.RegisterInfo;
 import io.gomint.world.block.BlockType;
 
-import io.gomint.server.registry.RegisterInfo;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author geNAZt
@@ -22,11 +25,6 @@ public class BlockOfRedstone extends Block implements io.gomint.world.block.Bloc
     }
 
     @Override
-    public boolean isTransparent() {
-        return true;
-    }
-
-    @Override
     public float getBlastResistance() {
         return 10.0f;
     }
@@ -34,6 +32,28 @@ public class BlockOfRedstone extends Block implements io.gomint.world.block.Bloc
     @Override
     public BlockType getType() {
         return BlockType.BLOCK_OF_REDSTONE;
+    }
+
+    @Override
+    public Class<? extends ItemStack>[] getToolInterfaces() {
+        return new Class[]{
+            ItemWoodenPickaxe.class,
+            ItemStonePickaxe.class,
+            ItemGoldenPickaxe.class,
+            ItemIronPickaxe.class,
+            ItemDiamondPickaxe.class,
+        };
+    }
+
+    @Override
+    public List<ItemStack> getDrops( ItemStack itemInHand ) {
+        if ( isCorrectTool( itemInHand ) ) {
+            return new ArrayList<ItemStack>() {{
+                add( ItemBlockOfRedstone.create( 1 ) );
+            }};
+        }
+
+        return new ArrayList<>();
     }
 
 }
